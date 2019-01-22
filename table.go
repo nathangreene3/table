@@ -5,11 +5,11 @@ import (
 )
 
 type table struct {
-	header      row
-	body        []row
-	height      int
-	width       int
-	maxColWidth []int // Maximum column width; each column is as wide as its largest header or body member
+	header      row   // Ordered set of descriptors for the corresponding body columns
+	body        []row // Ordered set of rows
+	maxColWidth []int // Maximum column width; each column is as wide as its largest header or body column member
+	height      int   // Number of rows in body
+	width       int   // Number of columns in header, body, and maxColWidth
 }
 
 type row []string
@@ -17,7 +17,7 @@ type col []string
 
 // String returns a formated representation of a table.
 func (t *table) String() string {
-	s := make([]string, 0, (t.height+1)*(t.width+1))
+	s := make([]string, 0, (t.height+2)*t.width) // Add header and underlines to height
 
 	// Add header
 	s = append(s, t.header[0])
@@ -46,18 +46,19 @@ func (t *table) String() string {
 }
 
 // newTable returns a table with the header set and an empty body. The height is set to zero and the width is set to the length of header.
-func newTable(header row) *table {
+func newTable(header row, body ...row) *table {
+	n := len(body)
 	t := &table{
 		header:      trimRow(header),
-		body:        make([]row, 0, 8),
+		body:        make([]row, 0, n),
 		height:      0,
 		width:       len(header),
-		maxColWidth: make([]int, 0, len(header)),
+		maxColWidth: make([]int, len(header)),
 	}
+	t.updateMaxColWidths()
 
-	// Set maximum column widths to header widths
-	for i := range t.header {
-		t.maxColWidth = append(t.maxColWidth, len(t.header[i])) // t.header was trimmed, header was not
+	for i := range body {
+		t.addRow(body[i])
 	}
 
 	return t
@@ -228,6 +229,12 @@ func (t *table) swapRows(i, j int) {
 	t.body[i], t.body[j] = t.body[j], t.body[i]
 }
 
+func (t *table) swapCols(i, j int) {
+	for k := range t.body {
+		t.body[k][i], t.body[k][j] = t.body[k][j], t.body[k][i]
+	}
+}
+
 func trimRow(r row) row {
 	s := make(row, 0, len(r))
 	for i := range r {
@@ -237,9 +244,7 @@ func trimRow(r row) row {
 }
 
 func copyRow(r row) row {
-	s := make(row, 0, len(r))
-	for i := range r {
-		s = append(s, r[i])
-	}
+	s := make(row, len(r))
+	copy(s, r)
 	return s
 }
