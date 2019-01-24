@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"strings"
 )
 
@@ -25,12 +26,15 @@ const (
 
 // String returns a formated representation of a table.
 func (t *table) String() string {
-	var pad string
+	if t.width == 0 {
+		u := strings.Repeat("-", len(t.name))
+		return u + "\n" + t.name + "\n" + u
+	}
 
-	s := make([]string, 0, 2) // Add header and underlines to height
+	s := make([]string, 0, 2) // String to build and return
 
 	// Add overline
-	underline := make([]string, 0, 2*t.width-1)
+	underline := make([]string, 0, 2*t.width)
 	underline = append(underline, strings.Repeat("-", t.width-1))
 	for i := 0; i < t.width; i++ {
 		underline = append(underline, strings.Repeat("-", maxInt(t.maxColWidth[i], 1)))
@@ -41,15 +45,16 @@ func (t *table) String() string {
 	s = append(s, "\n"+t.name+"\n")
 
 	// Add header
-	pad = strings.Repeat(" ", t.maxColWidth[0]-len(t.header[0]))
+	pad := strings.Repeat(" ", t.maxColWidth[0]-len(t.header[0]))
 	switch t.align[0] {
 	case alignRight:
 		s = append(s, pad+t.header[0])
+		fmt.Println(pad + t.header[0])
 	default:
 		s = append(s, t.header[0]+pad)
 	}
 	for i := 1; i < t.width; i++ {
-		pad = strings.Repeat(" ", t.maxColWidth[i]-len(t.header[i]))
+		pad = strings.Repeat(" ", maxInt(t.maxColWidth[i]-len(t.header[i]), 1))
 		switch t.align[i] {
 		case alignRight:
 			s = append(s, " "+pad+t.header[i])
@@ -74,7 +79,7 @@ func (t *table) String() string {
 			s = append(s, "\n"+t.body[i][0]+pad)
 		}
 		for j := 1; j < t.width; j++ {
-			pad = strings.Repeat(" ", t.maxColWidth[j]-len(t.body[i][j]))
+			pad = strings.Repeat(" ", maxInt(t.maxColWidth[j]-len(t.body[i][j]), 1))
 			switch t.align[j] {
 			case alignRight:
 				s = append(s, " "+pad+t.body[i][j])
@@ -334,28 +339,9 @@ func (t *table) removeColumn(i int) (string, col) {
 	header := t.header[i]       // Column header to return
 	c := make(col, 0, t.height) // Column to return
 
-	// if i+1 < t.width {
-	// 	// Remove column from somewhere before the last column
-	// 	t.header = append(t.header[:i], t.header[i+1:]...)
-	// 	t.maxColWidth = append(t.maxColWidth[:i], t.maxColWidth[i+1:]...)
-	// 	t.align = append(t.align[:i], t.align[i+1:]...)
-	// 	for j := range t.body {
-	// 		c = append(c, t.body[j][i])
-	// 		t.body[j] = append(t.body[j][:i], t.body[j][i+1:]...)
-	// 	}
-	// } else {
-	// 	// Remove last column
-	// 	t.header = t.header[:i]
-	// 	t.maxColWidth = t.maxColWidth[:i]
-	// 	t.align = t.align[:i]
-	// 	for j := range t.body {
-	// 		c = append(c, t.body[j][i])
-	// 		t.body[j] = t.body[j][:i]
-	// 	}
-	// }
-
 	t.swapCols(i, t.width-1)
 	t.setWidth(t.width - 1)
+	t.updateMaxColWidths()
 
 	return header, c
 }
