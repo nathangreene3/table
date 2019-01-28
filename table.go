@@ -4,6 +4,7 @@ import (
 	"strings"
 )
 
+// A table is a set of cells containing string entries.
 type table struct {
 	name        string      // Table name
 	header      row         // Ordered set of descriptors for the corresponding body columns
@@ -12,6 +13,7 @@ type table struct {
 	height      int         // Number of rows in body
 	width       int         // Number of columns in header, body, and maxColWidth
 	align       []alignment // TODO: add align left and right
+
 }
 
 type row []string
@@ -27,23 +29,24 @@ const (
 // String returns a formated representation of a table.
 func (t *table) String() string {
 	// Empty table body condition
+	var line string
 	if t.width == 0 {
-		u := strings.Repeat("-", len(t.name))
-		return u + "\n" + t.name + "\n" + u
+		line = strings.Repeat("-", maxInt(len(t.name), 1))
+		return line + "\n" + t.name + "\n" + line
 	}
 
-	s := make([]string, 0, 256) // String to build and return
+	s := make([]string, 0, t.length()) // String to build and return
 
-	// Add overline
-	underline := make([]string, 0, 2*t.width)
-	underline = append(underline, strings.Repeat("-", t.width-1))
-	for i := 0; i < t.width; i++ {
-		underline = append(underline, strings.Repeat("-", maxInt(t.maxColWidth[i], 1)))
+	// Create over/underline
+	var n int // Temporary storage
+	n = t.width - 1
+	for i := range t.maxColWidth {
+		n += maxInt(t.maxColWidth[i], 1)
 	}
-	s = append(s, underline...)
+	line = strings.Repeat("-", maxInt(n, len(t.name)))
 
-	// Add name
-	s = append(s, "\n"+t.name+"\n")
+	// Add overline and name
+	s = append(s, line+"\n"+t.name+"\n")
 
 	// Add header
 	var pad string
@@ -53,7 +56,6 @@ func (t *table) String() string {
 		pad = strings.Repeat(" ", t.maxColWidth[0]-len(t.header[0]))
 	}
 
-	var n int
 	switch t.align[0] {
 	case alignRight:
 		s = append(s, pad+t.header[0])
@@ -134,8 +136,7 @@ func (t *table) String() string {
 	}
 
 	// Add underline
-	s = append(s, "\n")
-	s = append(s, underline...)
+	s = append(s, "\n"+line)
 
 	return strings.Join(s, "")
 }
@@ -164,9 +165,9 @@ func (t *table) info() map[string]interface{} {
 	return m
 }
 
-// setCell sets a cell to a given value. If the indices are
-// greater than the width and height, then the table is
-// extended with empty rows and columns left aligned by default.
+// setCell sets a cell to a given value. If the indices are greater than
+// the width and height, then the table is extended with empty rows and
+// columns left aligned by default.
 func (t *table) setCell(i, j int, s string) {
 	if t.height <= i {
 		t.setHeight(i + 1)
@@ -183,9 +184,8 @@ func (t *table) setName(name string) {
 	t.name = strings.TrimSpace(name)
 }
 
-// setHeight expands or contracts the table. If expanding,
-// empty rows may be added. If contracting, rows may be
-// removed.
+// setHeight expands or contracts the table. If expanding, empty rows may
+// be added. If contracting, rows may be removed.
 func (t *table) setHeight(height int) {
 	// Contract body
 	if height < t.height {
@@ -199,8 +199,8 @@ func (t *table) setHeight(height int) {
 	}
 }
 
-// setWidth expands or contracts the table. If expanding, empty
-// columns may be added. If contracting, columns may be removed.
+// setWidth expands or contracts the table. If expanding, empty columns
+// may be added. If contracting, columns may be removed.
 func (t *table) setWidth(width int) {
 	// Extend header, body, maximum column width, and align
 	for len(t.header) < width {
@@ -237,7 +237,8 @@ func (t *table) setWidth(width int) {
 	t.width = width
 }
 
-// setAlignment sets the table alignment for each column. If contracting, columns may be removed.
+// setAlignment sets the table alignment for each column. If contracting,
+// columns may be removed.
 func (t *table) setAlignment(align []alignment) {
 	width := len(align)
 
@@ -255,7 +256,8 @@ func (t *table) setAlignment(align []alignment) {
 	copy(t.align, align)
 }
 
-// setHeader sets the header. If the new header is smaller than the table width, it is expanded. If it is larger, the table is expanded.
+// setHeader sets the header. If the new header is smaller than the table
+// width, it is expanded. If it is larger, the table is expanded.
 func (t *table) setHeader(header row) {
 	width := len(header)
 
@@ -282,9 +284,8 @@ func (t *table) setHeader(header row) {
 	}
 }
 
-// setColHeader sets a column header name and aligns it. If the
-// column index is wider than the table width, then the table is
-// extended.
+// setColHeader sets a column header name and aligns it. If the column
+// index is wider than the table width, then the table is extended.
 func (t *table) setColHeader(i int, header string, align alignment) {
 	if t.width <= i {
 		t.setWidth(i + 1)
@@ -295,9 +296,8 @@ func (t *table) setColHeader(i int, header string, align alignment) {
 	t.align[i] = align
 }
 
-// addRow appends a row to the table. If the new row is smaller
-// than the table width, it is expanded. If it is larger, the
-// table is expanded.
+// addRow appends a row to the table. If the new row is smaller than the
+// table width, it is expanded. If it is larger, the table is expanded.
 func (t *table) addRow(r row) {
 	width := len(r)
 
@@ -325,7 +325,9 @@ func (t *table) addRow(r row) {
 	}
 }
 
-// addColumn appends a column with its header to the table. If the new column is smaller than the table height, it is expanded. If it is larger, the table is expanded.
+// addColumn appends a column with its header to the table. If the new
+// column is smaller than the table height, it is expanded. If it is
+// larger, the table is expanded.
 func (t *table) addColumn(header string, c col, align alignment) {
 	height := len(c)
 
@@ -400,8 +402,8 @@ func (t *table) removeColumn(i int) (string, col) {
 	return header, c
 }
 
-// updateMaxColWidths sets each entry in maxColWidths to the
-// length of the largest entry in each column.
+// updateMaxColWidths sets each entry in maxColWidths to the length of
+// the largest entry in each column.
 func (t *table) updateMaxColWidths() {
 	// Set maximum column width to length of each header
 	for i := range t.header {
@@ -435,8 +437,8 @@ func (t *table) swapCols(i, j int) {
 	}
 }
 
-// trimRow returns a deep copy of a row with the leading and
-// trailing whitespace removed from each entry.
+// trimRow returns a deep copy of a row with the leading and trailing
+// whitespace removed from each entry.
 func trimRow(r row) row {
 	s := make(row, 0, len(r))
 	for i := range r {
@@ -450,4 +452,34 @@ func copyRow(r row) row {
 	s := make(row, len(r))
 	copy(s, r)
 	return s
+}
+
+func (t *table) length() int {
+	// Empty table
+	if t.width == 0 {
+		return 3*len(t.name) + 2
+	}
+
+	// Non-empty table
+	var s int
+	for i := range t.maxColWidth {
+		s += t.maxColWidth[i] + 1 // +1 refers to spaces and \n
+	}
+	return s * (t.height + 5)
+}
+
+// maxInt returns the maximum of two integers.
+func maxInt(x, y int) int {
+	if x < y {
+		return y
+	}
+	return x
+}
+
+// minInt returns the minimum of two integers.
+func minInt(x, y int) int {
+	if x < y {
+		return x
+	}
+	return y
 }
