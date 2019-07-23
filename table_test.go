@@ -3,10 +3,10 @@ package table
 import "testing"
 
 func TestImportCSV(t *testing.T) {
-	table, err := ImportCSV("./test0.csv", "star wars")
+	table, err := ImportCSV("./test0.csv", "star wars", 'f', 3)
 	if err != nil {
-		t.Fatalf("%v", err)
+		t.Fatalf("%s", err.Error())
 	}
 
-	t.Fatalf("%v", table)
+	t.Fatalf("\n%s", table.String())
 }

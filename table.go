@@ -9,12 +9,25 @@ import (
 	"strings"
 )
 
+type format byte
+
+const (
+	unset format = iota
+	strFmt
+	fltFmt
+	intFmt
+)
+
 // A Table holds rows/columns of data.
 type Table struct {
 	Name          string
 	header        Header
 	body          []Row
 	rows, columns int
+	formats       []format
+	widths        []int
+	fltFmt        byte
+	fltPrec       int
 }
 
 // A Header describes column data.
@@ -27,11 +40,30 @@ type Row []interface{}
 type Column []interface{}
 
 // New returns an empty table.
-func New(tableName string, maxRows, maxColumns int) *Table {
+func New(tableName string, fltFmt byte, fltPrec, maxRows, maxColumns int) *Table {
 	return &Table{
-		Name:   tableName,
-		header: make(Header, 0, maxColumns),
-		body:   make([]Row, 0, maxRows),
+		Name:    tableName,
+		header:  make(Header, 0, maxColumns),
+		body:    make([]Row, 0, maxRows),
+		formats: make([]format, 0, maxColumns),
+		widths:  make([]int, 0, maxColumns),
+		fltFmt:  fltFmt,
+		fltPrec: fltPrec,
+	}
+}
+
+// SetHeader ...
+func (t *Table) SetHeader(h Header) {
+	n := len(h)
+	t.setColumns(n)
+
+	var width int
+	for i := 0; i < n; i++ {
+		t.header[i] = strings.TrimSpace(h[i])
+		width = len(h[i])
+		if t.widths[i] < width {
+			t.widths[i] = width
+		}
 	}
 }
 
@@ -77,21 +109,42 @@ func (t *Table) Dimensions() (int, int) {
 
 // AppendRow to a table.
 func (t *Table) AppendRow(r Row) {
+	var (
+		ok       bool
+		width    int
+		intValue int
+		fltValue float64
+		n        = len(r)
+	)
+	t.setColumns(n)
 	t.body = append(t.body, r)
 	t.rows++
 
-	n := len(r)
-	if t.columns < n {
-		t.columns = n
-	}
+	for i := 0; i < n; i++ {
+		switch t.formats[i] {
+		case intFmt:
+			if intValue, ok = r[i].(int); ok {
+				width = len(strconv.Itoa(intValue))
+			} else if _, ok = r[i].(float64); ok {
+				t.formats[i] = fltFmt
+				width = len(strconv.FormatFloat(fltValue, t.fltFmt, t.fltPrec, 64))
+			} else {
+				t.formats[i] = strFmt
+				width = len(r[i].(string))
+			}
+		case fltFmt:
+			if _, ok = r[i].(float64); ok {
+				width = len(strconv.FormatFloat(fltValue, t.fltFmt, t.fltPrec, 64))
+			} else {
+				t.formats[i] = strFmt
+				width = len(r[i].(string))
+			}
+		case strFmt:
+			width = len(r[i].(string))
+		}
 
-	for len(t.header) < n {
-		t.header = append(t.header, "")
-	}
-
-	for i := range t.body {
-		for len(t.body[i]) < n {
-			t.body[i] = append(t.body[i], nil)
+		if t.widths[i] < width {
+			t.widths[i] = width
 		}
 	}
 }
@@ -107,6 +160,28 @@ func (t *Table) RemoveRow(i int) Row {
 
 	t.rows--
 	return r
+}
+
+// setColumns ...
+func (t *Table) setColumns(n int) {
+	t.columns = n
+	for len(t.header) < n {
+		t.header = append(t.header, "")
+	}
+
+	for i := range t.body {
+		for len(t.body[i]) < n {
+			t.body[i] = append(t.body[i], nil)
+		}
+	}
+
+	for len(t.formats) < n {
+		t.formats = append(t.formats, unset)
+	}
+
+	for len(t.widths) < n {
+		t.widths = append(t.widths, 0)
+	}
 }
 
 // AppendColumn to a table.
@@ -166,16 +241,16 @@ func (t *Table) RemoveColumn(i int) (string, Column) {
 }
 
 // ImportCSV imports a csv file into a table and returns it.
-func ImportCSV(path, tableName string) (*Table, error) {
+func ImportCSV(path, tableName string, fltFmt byte, fltPrec int) (*Table, error) {
 	file, err := os.Open(path)
 	if err != nil {
 		return nil, err
 	}
+	defer file.Close()
 
 	var (
 		reader = csv.NewReader(file)
-		t      = New(tableName, 0, 0)
-		value  float64
+		t      = New(tableName, fltFmt, fltPrec, 0, 0)
 		line   []string
 	)
 	line, err = reader.Read()
@@ -186,7 +261,7 @@ func ImportCSV(path, tableName string) (*Table, error) {
 		return t, nil
 	}
 
-	t.header = Header(line)
+	t.SetHeader(line)
 	for {
 		line, err = reader.Read()
 		if err != nil {
@@ -197,17 +272,17 @@ func ImportCSV(path, tableName string) (*Table, error) {
 		}
 
 		r := make(Row, 0, len(line))
-		for _, text := range line {
-			value, err = strconv.ParseFloat(text, 64)
-			if err != nil {
-				r = append(r, text)
-			} else {
-				r = append(r, value)
-			}
+		for _, strValue := range line {
+			r = append(r, strings.TrimSpace(strValue))
 		}
 
 		t.AppendRow(r)
 	}
+}
+
+// ExportCSV ... TODO
+func (t *Table) ExportCSV(path string) error {
+	return nil
 }
 
 // Copy a row.
@@ -224,7 +299,7 @@ func (c Column) Copy() Column {
 	return d
 }
 
-// isEmpty determines if a row contains data.
+// isEmpty determines if a row contains data or not.
 func (r Row) isEmpty() bool {
 	for i := range r {
 		if r[i] != nil {
@@ -252,13 +327,54 @@ func (h Header) String() string {
 	return strings.Join(h, " ")
 }
 
-func (t *Table) FmtString(precision int) string {
+// String ...
+func (t *Table) String() string {
+	// Create horizontal line
 	sb := strings.Builder{}
-	// widths := make([]int, t.columns)
-	// for i := range t.body {
-	// 	for j := range t.body[i] {
-	// 		v,ok
-	// 	}
-	// }
+	for i := range t.widths {
+		sb.WriteString("+" + strings.Repeat("-", t.widths[i]))
+	}
+
+	sb.WriteString("+\n")
+	hLine := sb.String()
+	sb.Reset()
+
+	// Write header
+	sb.WriteString(hLine)
+	for i := 0; i < t.columns; i++ {
+		switch t.formats[i] {
+		case intFmt:
+			fallthrough
+		case fltFmt:
+			sb.WriteString("|" + t.header[i] + strings.Repeat(" ", t.widths[i]-len(t.header[i])))
+		case strFmt:
+			sb.WriteString("|" + strings.Repeat(" ", t.widths[i]-len(t.header[i])) + t.header[i])
+		}
+	}
+
+	sb.WriteString("|\n")
+	sb.WriteString(hLine)
+
+	// Write body
+	var strValue string
+	for i := 0; i < t.rows; i++ {
+		for j := 0; j < t.columns; j++ {
+			switch t.formats[i] {
+			case intFmt:
+				strValue = strconv.Itoa(t.body[i][j].(int))
+				sb.WriteString("|" + strValue + strings.Repeat(" ", t.widths[i]-len(strValue)))
+			case fltFmt:
+				strValue = strconv.FormatFloat(t.body[i][j].(float64), t.fltFmt, t.fltPrec, 64)
+				sb.WriteString("|" + strValue + strings.Repeat(" ", t.widths[i]-len(strValue)))
+			case strFmt:
+				strValue = t.body[i][j].(string)
+				sb.WriteString("|" + strValue + strings.Repeat(" ", t.widths[i]-len(strValue)))
+			}
+		}
+
+		sb.WriteString("|\n")
+	}
+
+	sb.WriteString(hLine)
 	return sb.String()
 }
