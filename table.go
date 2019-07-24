@@ -12,8 +12,7 @@ import (
 type format byte
 
 const (
-	unset format = iota
-	strFmt
+	strFmt format = iota
 	fltFmt
 	intFmt
 )
@@ -109,38 +108,51 @@ func (t *Table) Dimensions() (int, int) {
 
 // AppendRow to a table.
 func (t *Table) AppendRow(r Row) {
-	var (
-		ok       bool
-		width    int
-		intValue int
-		fltValue float64
-		n        = len(r)
-	)
+	n := len(r)
 	t.setColumns(n)
 	t.body = append(t.body, r)
 	t.rows++
 
+	var width int
 	for i := 0; i < n; i++ {
 		switch t.formats[i] {
 		case intFmt:
-			if intValue, ok = r[i].(int); ok {
-				width = len(strconv.Itoa(intValue))
-			} else if _, ok = r[i].(float64); ok {
+			switch formatOf(r[i]) {
+			case intFmt:
+				width = len(strconv.Itoa(r[i].(int)))
+			case fltFmt:
 				t.formats[i] = fltFmt
-				width = len(strconv.FormatFloat(fltValue, t.fltFmt, t.fltPrec, 64))
-			} else {
+				width = len(strconv.FormatFloat(r[i].(float64), t.fltFmt, t.fltPrec, 64))
+			case strFmt:
 				t.formats[i] = strFmt
 				width = len(r[i].(string))
+			default:
+				panic("unknown type")
 			}
 		case fltFmt:
-			if _, ok = r[i].(float64); ok {
-				width = len(strconv.FormatFloat(fltValue, t.fltFmt, t.fltPrec, 64))
-			} else {
+			switch formatOf(r[i]) {
+			case intFmt:
+				width = len(strconv.FormatFloat(float64(r[i].(int)), t.fltFmt, t.fltPrec, 64))
+			case fltFmt:
+				width = len(strconv.FormatFloat(r[i].(float64), t.fltFmt, t.fltPrec, 64))
+			case strFmt:
 				t.formats[i] = strFmt
 				width = len(r[i].(string))
+			default:
+				panic("unknown type")
 			}
 		case strFmt:
-			width = len(r[i].(string))
+			switch formatOf(r[i]) {
+			case intFmt:
+				width = len(strconv.Itoa(r[i].(int)))
+			case fltFmt:
+				width = len(strconv.FormatFloat(r[i].(float64), t.fltFmt, t.fltPrec, 64))
+			case strFmt:
+				t.formats[i] = strFmt
+				width = len(r[i].(string))
+			default:
+				panic("unknown type")
+			}
 		}
 
 		if t.widths[i] < width {
@@ -169,17 +181,33 @@ func (t *Table) setColumns(n int) {
 		t.header = append(t.header, "")
 	}
 
+	for n < len(t.header) {
+		t.header = append(t.header, "")
+	}
+
 	for i := range t.body {
 		for len(t.body[i]) < n {
+			t.body[i] = append(t.body[i], nil)
+		}
+
+		for n < len(t.body[i]) {
 			t.body[i] = append(t.body[i], nil)
 		}
 	}
 
 	for len(t.formats) < n {
-		t.formats = append(t.formats, unset)
+		t.formats = append(t.formats, intFmt)
+	}
+
+	for n < len(t.formats) {
+		t.formats = append(t.formats, intFmt)
 	}
 
 	for len(t.widths) < n {
+		t.widths = append(t.widths, 0)
+	}
+
+	for n < len(t.widths) {
 		t.widths = append(t.widths, 0)
 	}
 }
@@ -273,7 +301,7 @@ func ImportCSV(path, tableName string, fltFmt byte, fltPrec int) (*Table, error)
 
 		r := make(Row, 0, len(line))
 		for _, strValue := range line {
-			r = append(r, strings.TrimSpace(strValue))
+			r = append(r, parse(strValue))
 		}
 
 		t.AppendRow(r)
@@ -344,7 +372,7 @@ func (t *Table) String() string {
 	for i := 0; i < t.columns; i++ {
 		switch t.formats[i] {
 		case intFmt:
-			fallthrough
+			sb.WriteString("|" + t.header[i] + strings.Repeat(" ", t.widths[i]-len(t.header[i])))
 		case fltFmt:
 			sb.WriteString("|" + t.header[i] + strings.Repeat(" ", t.widths[i]-len(t.header[i])))
 		case strFmt:
@@ -359,16 +387,22 @@ func (t *Table) String() string {
 	var strValue string
 	for i := 0; i < t.rows; i++ {
 		for j := 0; j < t.columns; j++ {
-			switch t.formats[i] {
+			switch formatOf(t.body[i][j]) {
 			case intFmt:
 				strValue = strconv.Itoa(t.body[i][j].(int))
-				sb.WriteString("|" + strValue + strings.Repeat(" ", t.widths[i]-len(strValue)))
 			case fltFmt:
 				strValue = strconv.FormatFloat(t.body[i][j].(float64), t.fltFmt, t.fltPrec, 64)
-				sb.WriteString("|" + strValue + strings.Repeat(" ", t.widths[i]-len(strValue)))
 			case strFmt:
 				strValue = t.body[i][j].(string)
-				sb.WriteString("|" + strValue + strings.Repeat(" ", t.widths[i]-len(strValue)))
+			}
+
+			switch t.formats[j] {
+			case intFmt:
+				sb.WriteString("|" + strings.Repeat(" ", t.widths[j]-len(strValue)) + strValue)
+			case fltFmt:
+				sb.WriteString("|" + strings.Repeat(" ", t.widths[j]-len(strValue)) + strValue)
+			case strFmt:
+				sb.WriteString("|" + strValue + strings.Repeat(" ", t.widths[j]-len(strValue)))
 			}
 		}
 
@@ -377,4 +411,29 @@ func (t *Table) String() string {
 
 	sb.WriteString(hLine)
 	return sb.String()
+}
+
+func parse(s string) interface{} {
+	if x, err := strconv.Atoi(s); err == nil {
+		return x
+	}
+
+	if x, err := strconv.ParseFloat(s, 64); err == nil {
+		return x
+	}
+
+	return s
+}
+
+func formatOf(x interface{}) format {
+	switch x.(type) {
+	case int:
+		return intFmt
+	case float64:
+		return fltFmt
+	case string:
+		return strFmt
+	default:
+		return strFmt
+	}
 }

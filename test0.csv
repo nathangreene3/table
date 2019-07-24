@@ -1,8 +1,5 @@
-i,first,last,
-0,luke,skywalker,
-,obi-wan,kenobi,
-2,yoda,  ,
-3,leia,organa,
-4,,solo,
-5,darth,vader,
-6,jabba,the,hut
+integers,strings,floats
+0,a,0.
+1,b,1.0
+2,c,2
+3,d,3.0
