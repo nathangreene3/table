@@ -8,5 +8,6 @@ func TestImportCSV(t *testing.T) {
 		t.Fatalf("%s", err.Error())
 	}
 
+	table.Clean()
 	t.Fatalf("\n%s", table.String())
 }

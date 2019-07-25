@@ -238,6 +238,32 @@ func (t *Table) RemoveColumn(i int) (string, Column) {
 	return h, c
 }
 
+// Clean removes empty rows and columns.
+func (t *Table) Clean() {
+	// Remove empty rows
+	for i := 0; i < t.rows; i++ {
+		if t.body[i].isEmpty() {
+			t.RemoveRow(i)
+		}
+	}
+
+	// Remove empty columns
+	var isEmpty bool
+	for j := 0; j < t.columns; j++ {
+		if isEmpty = t.header[j] == ""; !isEmpty {
+			continue
+		}
+
+		for i := 0; i < t.rows && isEmpty; i++ {
+			isEmpty = t.body[i][j] == nil
+		}
+
+		if isEmpty {
+			t.RemoveColumn(j)
+		}
+	}
+}
+
 // setColumns to a given size n.
 func (t *Table) setColumns(n int) {
 	t.columns = n
@@ -404,8 +430,11 @@ func (h Header) String() string {
 
 // isEmpty determines if a row contains data or not.
 func (r Row) isEmpty() bool {
-	for i := range r {
-		if r[i] != nil {
+	for _, v := range r {
+		switch baseTypeOf(v) {
+		case integerType:
+			return false
+		case floatType:
 			return false
 		}
 	}
