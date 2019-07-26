@@ -9,5 +9,9 @@ func TestImportCSV(t *testing.T) {
 	}
 
 	table.Clean()
+	if err = table.ExportCSV("test.csv"); err != nil {
+		t.Fatalf("\n%v", err)
+	}
+
 	t.Fatalf("\n%s", table.String())
 }

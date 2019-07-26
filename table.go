@@ -360,9 +360,22 @@ func ImportCSV(path, tableName string, fltFmt byte, fltPrec int) (*Table, error)
 	}
 }
 
-// ExportCSV ... TODO
+// ExportCSV to a given path.
 func (t *Table) ExportCSV(path string) error {
-	return nil
+	file, err := os.Create(path)
+	if err != nil {
+		return err
+	}
+	defer file.Close()
+
+	writer := csv.NewWriter(file)
+	writer.Write([]string(t.header))
+	for _, r := range t.body {
+		writer.Write(r.SliceString())
+	}
+
+	writer.Flush()
+	return writer.Error()
 }
 
 // Copy a table.

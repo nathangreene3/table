@@ -2,6 +2,7 @@ package table
 
 import (
 	"fmt"
+	"strconv"
 	"strings"
 )
 
@@ -37,4 +38,23 @@ func (r Row) String() string {
 	}
 
 	return sb.String()
+}
+
+// SliceString returns the row formatted as []string.
+func (r Row) SliceString() []string {
+	s := make([]string, 0, len(r))
+	for _, v := range r {
+		switch baseTypeOf(v) {
+		case integerType:
+			s = append(s, strconv.Itoa(v.(int)))
+		case floatType:
+			s = append(s, strconv.FormatFloat(v.(float64), 'f', -1, 64))
+		case stringType:
+			s = append(s, v.(string))
+		default:
+			panic("uknown base type")
+		}
+	}
+
+	return s
 }
