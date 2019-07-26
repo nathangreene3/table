@@ -2,24 +2,11 @@ package table
 
 import (
 	"encoding/csv"
-	"fmt"
 	"io"
 	"os"
 	"strconv"
 	"strings"
 )
-
-// baseType indicates the basic underlying type of a interface{} value.
-type baseType byte
-
-// A Header describes column data.
-type Header []string
-
-// A Row is a single entry in a table.
-type Row []interface{}
-
-// A Column is a collection of the ith values in a body of rows.
-type Column []interface{}
 
 // A Table holds rows/columns of data.
 type Table struct {
@@ -32,12 +19,6 @@ type Table struct {
 	floatFmt       byte
 	floatPrecision int
 }
-
-const (
-	stringType baseType = iota
-	floatType
-	integerType
-)
 
 // New returns an empty table.
 func New(name string, floatFmt byte, floatPrec, maxRows, maxColumns int) *Table {
@@ -262,6 +243,43 @@ func (t *Table) Clean() {
 			t.RemoveColumn(j)
 		}
 	}
+
+	t.Format()
+}
+
+// Format a table.
+func (t *Table) Format() {
+	for i := 0; i < t.columns; i++ {
+		t.colBaseTypes[i] = integerType
+		t.colWidths[i] = len(t.header[i])
+	}
+
+	var (
+		bt baseType
+		w  int
+	)
+	for i := 0; i < t.rows; i++ {
+		for j := 0; j < t.columns; j++ {
+			if bt = baseTypeOf(t.body[i][j]); bt < t.colBaseTypes[j] {
+				t.colBaseTypes[j] = bt
+			}
+
+			switch bt {
+			case integerType:
+				w = len(strconv.Itoa(t.body[i][j].(int)))
+			case floatType:
+				w = len(strconv.FormatFloat(t.body[i][j].(float64), t.floatFmt, t.floatPrecision, 64))
+			case stringType:
+				w = len(t.body[i][j].(string))
+			default:
+				panic("unknown base type")
+			}
+
+			if t.colWidths[j] < w {
+				t.colWidths[j] = w
+			}
+		}
+	}
 }
 
 // setColumns to a given size n.
@@ -302,11 +320,6 @@ func (t *Table) setColumns(n int) {
 	}
 }
 
-// ExportCSV ... TODO
-func (t *Table) ExportCSV(path string) error {
-	return nil
-}
-
 // ImportCSV imports a csv file into a table and returns it.
 func ImportCSV(path, tableName string, fltFmt byte, fltPrec int) (*Table, error) {
 	file, err := os.Open(path)
@@ -345,6 +358,11 @@ func ImportCSV(path, tableName string, fltFmt byte, fltPrec int) (*Table, error)
 
 		t.AppendRow(r)
 	}
+}
+
+// ExportCSV ... TODO
+func (t *Table) ExportCSV(path string) error {
+	return nil
 }
 
 // Copy a table.
@@ -414,91 +432,4 @@ func (t *Table) String() string {
 
 	sb.WriteString(hLine)
 	return sb.String()
-}
-
-// Copy a header.
-func (h Header) Copy() Header {
-	cpy := make(Header, 0, len(h))
-	copy(cpy, h)
-	return cpy
-}
-
-// String returns a string-representation of a header.
-func (h Header) String() string {
-	return strings.Join(h, " ")
-}
-
-// isEmpty determines if a row contains data or not.
-func (r Row) isEmpty() bool {
-	for _, v := range r {
-		switch baseTypeOf(v) {
-		case integerType:
-			return false
-		case floatType:
-			return false
-		}
-	}
-
-	return true
-}
-
-// Copy a row.
-func (r Row) Copy() Row {
-	cpy := make(Row, len(r))
-	copy(cpy, r)
-	return cpy
-}
-
-// String returns a string-representation of a row.
-func (r Row) String() string {
-	sb := strings.Builder{}
-	for i := range r {
-		sb.WriteString(fmt.Sprintf("%v", r[i]))
-	}
-
-	return sb.String()
-}
-
-// Copy a column.
-func (c Column) Copy() Column {
-	cpy := make(Column, len(c))
-	copy(cpy, c)
-	return cpy
-}
-
-// String returns a string-representation of a column.
-func (c Column) String() string {
-	sb := strings.Builder{}
-	for i := range c {
-		sb.WriteString(fmt.Sprintf("%v", c[i]))
-	}
-
-	return sb.String()
-}
-
-// toBaseType converts a string to the first type it converts to successfully. Preference is given as int, float64, string.
-func toBaseType(s string) interface{} {
-	if x, err := strconv.Atoi(s); err == nil {
-		return x
-	}
-
-	if x, err := strconv.ParseFloat(s, 64); err == nil {
-		return x
-	}
-
-	return s
-}
-
-// baseTypeOf returns format corresponding to the underlying type of x.
-func baseTypeOf(x interface{}) baseType {
-	switch x.(type) {
-	case int:
-		return integerType
-	case float64:
-		return floatType
-	case string:
-		return stringType
-	default:
-		panic("unknown type")
-	}
 }
