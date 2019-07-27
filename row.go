@@ -17,6 +17,10 @@ func (r Row) isEmpty() bool {
 			return false
 		case floatType:
 			return false
+		case stringType:
+			if 0 < len(v.(string)) {
+				return false
+			}
 		}
 	}
 
