@@ -8,8 +8,7 @@ func TestImportCSV(t *testing.T) {
 		t.Fatalf("%s", err.Error())
 	}
 
-	table.Clean()
-	if err = table.ExportCSV("test.csv"); err != nil {
+	if err = table.ExportCSV("test1.csv"); err != nil {
 		t.Fatalf("\n%v", err)
 	}
 

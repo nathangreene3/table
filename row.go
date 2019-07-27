@@ -43,12 +43,18 @@ func (r Row) String() string {
 // SliceString returns the row formatted as []string.
 func (r Row) SliceString() []string {
 	s := make([]string, 0, len(r))
+	var x string
 	for _, v := range r {
 		switch baseTypeOf(v) {
 		case integerType:
 			s = append(s, strconv.Itoa(v.(int)))
 		case floatType:
-			s = append(s, strconv.FormatFloat(v.(float64), 'f', -1, 64))
+			x = strconv.FormatFloat(v.(float64), 'f', -1, 64)
+			if strings.ContainsRune(x, '.') {
+				s = append(s, x)
+			} else {
+				s = append(s, x+".0")
+			}
 		case stringType:
 			s = append(s, v.(string))
 		default:

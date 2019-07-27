@@ -282,6 +282,51 @@ func (t *Table) Format() {
 	}
 }
 
+// SetMinFormat for each table value within the context of its column format.
+func (t *Table) SetMinFormat() {
+	var (
+		bt baseType
+		x  string
+	)
+	for i := 0; i < t.rows; i++ {
+		for j := 0; j < t.columns; j++ {
+			if bt = baseTypeOf(t.body[i][j]); bt < t.colBaseTypes[j] {
+				t.colBaseTypes[j] = bt
+			}
+
+			switch bt {
+			case integerType:
+				switch t.colBaseTypes[j] {
+				case integerType: // Do nothing
+				case floatType:
+					t.body[i][j] = float64(t.body[i][j].(int)) // Convert to float64
+				case stringType:
+					t.body[i][j] = strconv.Itoa(t.body[i][j].(int)) // Convert to string
+				default:
+					panic("unknown base type")
+				}
+			case floatType:
+				switch t.colBaseTypes[j] {
+				case integerType: // Do nothing? Data loss if we convert float to int
+				case floatType: // Do nothing
+				case stringType:
+					x = strconv.FormatFloat(t.body[i][j].(float64), 'f', -1, 64)
+					if strings.ContainsRune(x, '.') {
+						t.body[i][j] = x
+					} else {
+						t.body[i][j] = x + ".0"
+					}
+				default:
+					panic("unknown base type")
+				}
+			case stringType: // Do nothing
+			default:
+				panic("unknown base type")
+			}
+		}
+	}
+}
+
 // setColumns to a given size n.
 func (t *Table) setColumns(n int) {
 	t.columns = n
@@ -360,8 +405,12 @@ func ImportCSV(path, tableName string, fltFmt byte, fltPrec int) (*Table, error)
 	}
 }
 
-// ExportCSV to a given path.
+// ExportCSV to a given path. Table will be cleaned and set to minimum format.
 func (t *Table) ExportCSV(path string) error {
+	t.Clean()
+	t.SetMinFormat()
+
+	os.Remove(path)
 	file, err := os.Create(path)
 	if err != nil {
 		return err
