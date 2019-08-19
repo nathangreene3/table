@@ -44,8 +44,8 @@ func (r Row) String() string {
 	return sb.String()
 }
 
-// SliceString returns the row formatted as []string.
-func (r Row) SliceString() []string {
+// Strings returns the row formatted as []string.
+func (r Row) Strings() []string {
 	s := make([]string, 0, len(r))
 	var x string
 	for _, v := range r {

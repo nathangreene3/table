@@ -3,7 +3,6 @@ package table
 import (
 	"encoding/csv"
 	"io"
-	"os"
 	"strconv"
 	"strings"
 )
@@ -19,6 +18,27 @@ type Table struct {
 	floatFmt       byte
 	floatPrecision int
 }
+
+// FloatFormat defines formatting float values.
+type FloatFormat byte
+
+const (
+	// s="FormatFloat func(f float64, fmt byte, prec int, bitSize int) string
+	// FormatFloat converts the floating-point number f to a string, according to the format fmt and precision prec. It rounds the result assuming that the original was obtained from a floating-point value of bitSize bits (32 for float32, 64 for float64).
+
+	// The format fmt is one of 'b' (-ddddp±ddd, a binary exponent), 'e' (-d.dddde±dd, a decimal exponent), 'E' (-d.ddddE±dd, a decimal exponent), 'f' (-ddd.dddd, no exponent), 'g' ('e' for large exponents, 'f' otherwise), or 'G' ('E' for large exponents, 'f' otherwise).
+
+	// The precision prec controls the number of digits (excluding the exponent) printed by the 'e', 'E', 'f', 'g', and 'G' formats. For 'e', 'E', and 'f' it is the number of digits after the decimal point. For 'g' and 'G' it is the maximum number of significant digits (trailing zeros are removed). The special precision -1 uses the smallest number of digits necessary such that ParseFloat will return f exactly."
+
+	// FltFmtBinExp formats floats as a binary exponent value -dddp±ddd.
+	FltFmtBinExp FloatFormat = 'b'
+	// FltFmtDecExp formats floats as a decimal exponent value (scientific notation) -d.ddde±ddd.
+	FltFmtDecExp FloatFormat = 'e'
+	// FltFmtNoExp formats floats as a decimal value -ddd.ddd.
+	FltFmtNoExp FloatFormat = 'f'
+	// FltFmtLrgExp formats floats as a large exponent value (scientific notation) -d.ddde±ddd.
+	FltFmtLrgExp FloatFormat = 'g'
+)
 
 // New returns an empty table.
 func New(name string, floatFmt byte, floatPrec, maxRows, maxColumns int) *Table {
@@ -258,6 +278,7 @@ func (t *Table) Format() {
 		bt baseType
 		w  int
 	)
+
 	for i := 0; i < t.rows; i++ {
 		for j := 0; j < t.columns; j++ {
 			if bt = baseTypeOf(t.body[i][j]); bt < t.colBaseTypes[j] {
@@ -365,20 +386,12 @@ func (t *Table) setColumns(n int) {
 	}
 }
 
-// ImportCSV imports a csv file into a table and returns it.
-func ImportCSV(path, tableName string, fltFmt byte, fltPrec int) (*Table, error) {
-	file, err := os.Open(path)
-	if err != nil {
-		return nil, err
-	}
-	defer file.Close()
+// ImportFromCSV imports a csv file into a table and returns it.
+func ImportFromCSV(reader *csv.Reader, tableName string, fltFmt byte, fltPrec int) (*Table, error) {
+	t := New(tableName, fltFmt, fltPrec, 0, 0)
 
-	var (
-		reader = csv.NewReader(file)
-		t      = New(tableName, fltFmt, fltPrec, 0, 0)
-		line   []string
-	)
-	line, err = reader.Read()
+	// Header
+	line, err := reader.Read()
 	if err != nil {
 		if err != io.EOF {
 			return nil, err
@@ -387,6 +400,8 @@ func ImportCSV(path, tableName string, fltFmt byte, fltPrec int) (*Table, error)
 	}
 
 	t.SetHeader(line)
+
+	// Body
 	for {
 		line, err = reader.Read()
 		if err != nil {
@@ -405,22 +420,14 @@ func ImportCSV(path, tableName string, fltFmt byte, fltPrec int) (*Table, error)
 	}
 }
 
-// ExportCSV to a given path. Table will be cleaned and set to minimum format.
-func (t *Table) ExportCSV(path string) error {
+// ExportToCSV to a given path. Table will be cleaned and set to minimum format.
+func (t *Table) ExportToCSV(writer *csv.Writer) error {
 	t.Clean()
 	t.SetMinFormat()
 
-	os.Remove(path)
-	file, err := os.Create(path)
-	if err != nil {
-		return err
-	}
-	defer file.Close()
-
-	writer := csv.NewWriter(file)
 	writer.Write([]string(t.header))
 	for _, r := range t.body {
-		writer.Write(r.SliceString())
+		writer.Write(r.Strings())
 	}
 
 	writer.Flush()

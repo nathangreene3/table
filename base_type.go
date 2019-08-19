@@ -6,7 +6,7 @@ import "strconv"
 type baseType byte
 
 const (
-	stringType baseType = iota
+	stringType baseType = 1 << iota
 	floatType
 	integerType
 )
