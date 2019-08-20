@@ -6,14 +6,14 @@ import (
 	"testing"
 )
 
-func TestImportCSV(t *testing.T) {
+func TestImportExportCSV(t *testing.T) {
 	inFile, err := os.Open("test0.csv")
 	if err != nil {
 		t.Fatalf("%s", err.Error())
 	}
 	defer inFile.Close()
 
-	table, err := ImportFromCSV(csv.NewReader(inFile), "star wars", 'f', 3)
+	table, err := ImportFromCSV(csv.NewReader(inFile), "star wars", FltFmtNoExp, 3)
 	if err != nil {
 		t.Fatalf("%s", err.Error())
 	}
@@ -28,5 +28,5 @@ func TestImportCSV(t *testing.T) {
 		t.Fatalf("\n%v", err)
 	}
 
-	// t.Fatalf("\n%s", table.String())
+	t.Fatalf("\n%s", table.String())
 }
