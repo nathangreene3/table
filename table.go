@@ -37,8 +37,8 @@ const (
 )
 
 // New returns an empty table.
-func New(name string, floatFmt FltFmt, floatPrec FltPrecFmt, maxRows, maxColumns int) *Table {
-	return &Table{
+func New(name string, floatFmt FltFmt, floatPrec FltPrecFmt, maxRows, maxColumns int) Table {
+	return Table{
 		Name:           name,
 		header:         make(Header, 0, maxColumns),
 		body:           make([]Row, 0, maxRows),
@@ -155,7 +155,7 @@ func (t *Table) Clean() {
 }
 
 // Copy a table.
-func (t *Table) Copy() *Table {
+func (t *Table) Copy() Table {
 	cpy := New(t.Name, t.floatFmt, t.floatPrecision, t.rows, t.columns)
 	cpy.SetHeader(t.header)
 	for i := 0; i < t.rows; i++ {
@@ -251,14 +251,14 @@ func (t *Table) GetRow(i int) Row {
 }
 
 // ImportFromCSV imports a csv file into a table and returns it.
-func ImportFromCSV(reader *csv.Reader, tableName string, fltFmt FltFmt, fltPrec FltPrecFmt) (*Table, error) {
+func ImportFromCSV(reader *csv.Reader, tableName string, fltFmt FltFmt, fltPrec FltPrecFmt) (Table, error) {
 	t := New(tableName, fltFmt, fltPrec, 0, 0)
 
 	// Header
 	line, err := reader.Read()
 	if err != nil {
 		if err != io.EOF {
-			return nil, err
+			return t, err
 		}
 		return t, nil
 	}
@@ -270,7 +270,7 @@ func ImportFromCSV(reader *csv.Reader, tableName string, fltFmt FltFmt, fltPrec 
 		line, err = reader.Read()
 		if err != nil {
 			if err != io.EOF {
-				return nil, err
+				return t, err
 			}
 			return t, nil
 		}
@@ -402,6 +402,7 @@ func (t *Table) SetMinFormat() {
 		bt baseType
 		x  string
 	)
+
 	for i := 0; i < t.rows; i++ {
 		for j := 0; j < t.columns; j++ {
 			if bt = baseTypeOf(t.body[i][j]); bt < t.colBaseTypes[j] {
@@ -444,7 +445,7 @@ func (t *Table) SetMinFormat() {
 // String returns a string-representation of a table.
 func (t *Table) String() string {
 	// Create horizontal line
-	sb := &strings.Builder{}
+	var sb strings.Builder
 	for i := range t.colWidths {
 		sb.WriteString("+" + strings.Repeat("-", t.colWidths[i]))
 	}
@@ -458,9 +459,9 @@ func (t *Table) String() string {
 	for i := 0; i < t.columns; i++ {
 		switch t.colBaseTypes[i] {
 		case integerType, floatType:
-			sb.WriteString("|" + t.header[i] + strings.Repeat(" ", t.colWidths[i]-len(t.header[i])))
-		case stringType:
 			sb.WriteString("|" + strings.Repeat(" ", t.colWidths[i]-len(t.header[i])) + t.header[i])
+		case stringType:
+			sb.WriteString("|" + t.header[i] + strings.Repeat(" ", t.colWidths[i]-len(t.header[i])))
 		}
 	}
 
