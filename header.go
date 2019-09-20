@@ -5,6 +5,16 @@ import "strings"
 // A Header describes column data.
 type Header []string
 
+// NewHeader converts a list of column names to a header.
+func NewHeader(colNames ...string) Header {
+	h := make(Header, 0, len(colNames))
+	for _, colName := range colNames {
+		h = append(h, colName)
+	}
+
+	return h
+}
+
 // Copy a header.
 func (h Header) Copy() Header {
 	cpy := make(Header, 0, len(h))
