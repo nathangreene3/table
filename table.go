@@ -12,11 +12,11 @@ type Table struct {
 	Name           string
 	header         Header
 	body           []Row
-	rows, columns  int
 	colBaseTypes   []baseType
 	colWidths      []int
-	floatFmt       FltFmt
+	rows, columns  int
 	floatPrecision FltPrecFmt
+	floatFmt       FltFmt
 }
 
 // FltFmt defines formatting float values.
@@ -44,8 +44,8 @@ func New(name string, floatFmt FltFmt, floatPrec FltPrecFmt, maxRows, maxColumns
 		body:           make([]Row, 0, maxRows),
 		colBaseTypes:   make([]baseType, 0, maxColumns),
 		colWidths:      make([]int, 0, maxColumns),
-		floatFmt:       floatFmt,
 		floatPrecision: floatPrec,
+		floatFmt:       floatFmt,
 	}
 }
 
@@ -174,7 +174,6 @@ func (t *Table) Dimensions() (int, int) {
 func (t *Table) ExportToCSV(writer *csv.Writer) error {
 	t.Clean()
 	t.SetMinFormat()
-
 	writer.Write([]string(t.header))
 	for _, r := range t.body {
 		writer.Write(r.Strings())
@@ -228,8 +227,8 @@ func (t *Table) Get(i, j int) interface{} {
 // GetColumn returns the column header and a copy of the column at a given index.
 func (t *Table) GetColumn(i int) (string, Column) {
 	c := make(Column, 0, len(t.body))
-	for j := range t.body {
-		c = append(c, t.body[j][i])
+	for _, r := range t.body {
+		c = append(c, r[i])
 	}
 
 	return t.header[i], c
@@ -446,8 +445,8 @@ func (t *Table) SetMinFormat() {
 func (t *Table) String() string {
 	// Create horizontal line
 	var sb strings.Builder
-	for i := range t.colWidths {
-		sb.WriteString("+" + strings.Repeat("-", t.colWidths[i]))
+	for _, w := range t.colWidths {
+		sb.WriteString("+" + strings.Repeat("-", w))
 	}
 
 	sb.WriteString("+\n")

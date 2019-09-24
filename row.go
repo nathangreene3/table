@@ -9,6 +9,16 @@ import (
 // A Row is a single entry in a table.
 type Row []interface{}
 
+// NewRow converts various items to a row.
+func NewRow(values ...interface{}) Row {
+	r := make(Row, 0, len(values))
+	for _, value := range values {
+		r = append(r, value)
+	}
+
+	return r
+}
+
 // Copy a row.
 func (r Row) Copy() Row {
 	cpy := make(Row, len(r))
