@@ -8,8 +8,8 @@ type Header []string
 // NewHeader converts a list of column names to a header.
 func NewHeader(colNames ...string) Header {
 	h := make(Header, 0, len(colNames))
-	for _, colName := range colNames {
-		h = append(h, colName)
+	for _, c := range colNames {
+		h = append(h, c)
 	}
 
 	return h

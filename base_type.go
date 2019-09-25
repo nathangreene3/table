@@ -11,7 +11,8 @@ const (
 	integerType
 )
 
-// toBaseType converts a string to the first type it converts to successfully. Preference is given as int, float64, string.
+// toBaseType converts a string to the first type it converts to successfully.
+// Preference is given as int, float64, string.
 func toBaseType(s string) interface{} {
 	if n, err := strconv.Atoi(s); err == nil {
 		return n

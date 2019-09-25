@@ -12,8 +12,8 @@ type Row []interface{}
 // NewRow converts various items to a row.
 func NewRow(values ...interface{}) Row {
 	r := make(Row, 0, len(values))
-	for _, value := range values {
-		r = append(r, value)
+	for _, v := range values {
+		r = append(r, v)
 	}
 
 	return r
@@ -45,8 +45,8 @@ func (r Row) isEmpty() bool {
 // String returns a string-representation of a row.
 func (r Row) String() string {
 	var sb strings.Builder
-	for i := range r {
-		sb.WriteString(fmt.Sprintf("%v", r[i]))
+	for _, v := range r {
+		sb.WriteString(fmt.Sprintf("%v", v))
 	}
 
 	return sb.String()
