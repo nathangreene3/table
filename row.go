@@ -54,17 +54,13 @@ func (r Row) String() string {
 
 // Strings returns the row formatted as []string.
 func (r Row) Strings() []string {
-	var (
-		s = make([]string, 0, len(r))
-		x string
-	)
-
+	s := make([]string, 0, len(r))
 	for _, v := range r {
 		switch baseTypeOf(v) {
 		case integerType:
 			s = append(s, strconv.Itoa(v.(int)))
 		case floatType:
-			if x = strconv.FormatFloat(v.(float64), 'f', -1, 64); strings.ContainsRune(x, '.') {
+			if x := strconv.FormatFloat(v.(float64), 'f', -1, 64); strings.ContainsRune(x, '.') {
 				s = append(s, x)
 			} else {
 				s = append(s, x+".0")

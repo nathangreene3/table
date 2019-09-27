@@ -37,13 +37,22 @@ const (
 )
 
 // New returns an empty table.
-func New(name string, floatFmt FltFmt, floatPrec FltPrecFmt, maxRows, maxColumns int) Table {
+func New(name string, floatFmt FltFmt, floatPrec FltPrecFmt) Table {
+	if floatFmt == 0 {
+		floatFmt = FltFmtNoExp
+	}
+
+	var (
+		maxRows = 1 << 8
+		maxCols = 1 << 8
+	)
+
 	return Table{
 		Name:           name,
-		header:         make(Header, 0, maxColumns),
+		header:         make(Header, 0, maxCols),
 		body:           make([]Row, 0, maxRows),
-		colBaseTypes:   make([]baseType, 0, maxColumns),
-		colWidths:      make([]int, 0, maxColumns),
+		colBaseTypes:   make([]baseType, 0, maxCols),
+		colWidths:      make([]int, 0, maxCols),
 		floatPrecision: floatPrec,
 		floatFmt:       floatFmt,
 	}
@@ -74,7 +83,7 @@ func (t *Table) AppendColumn(columnHeader string, c Column) {
 // AppendRow to a table.
 func (t *Table) AppendRow(r Row) {
 	n := len(r)
-	t.setColumns(n)
+	t.setColSize(n)
 	t.body = append(t.body, r)
 	t.rows++
 
@@ -154,9 +163,24 @@ func (t *Table) Clean() {
 	t.Format()
 }
 
+// Column returns the column header and a copy of the column at a given index.
+func (t *Table) Column(i int) (string, Column) {
+	c := make(Column, 0, len(t.body))
+	for _, r := range t.body {
+		c = append(c, r[i])
+	}
+
+	return t.header[i], c
+}
+
+// ColumnHeader at a given index.
+func (t *Table) ColumnHeader(i int) string {
+	return t.header[i]
+}
+
 // Copy a table.
 func (t *Table) Copy() Table {
-	cpy := New(t.Name, t.floatFmt, t.floatPrecision, t.rows, t.columns)
+	cpy := New(t.Name, t.floatFmt, t.floatPrecision)
 	cpy.SetHeader(t.header)
 	for i := 0; i < t.rows; i++ {
 		cpy.AppendRow(t.body[i].Copy())
@@ -170,10 +194,11 @@ func (t *Table) Dimensions() (int, int) {
 	return t.rows, t.columns
 }
 
-// ExportToCSV to a given path. Table will be cleaned and set to minimum format.
-func (t *Table) ExportToCSV(writer *csv.Writer) error {
+// Export to a csv writer. Table will be cleaned and set to minimum format.
+func (t *Table) Export(writer *csv.Writer) error {
 	t.Clean()
 	t.SetMinFormat()
+
 	writer.Write([]string(t.header))
 	for _, r := range t.body {
 		writer.Write(r.Strings())
@@ -183,8 +208,11 @@ func (t *Table) ExportToCSV(writer *csv.Writer) error {
 	return writer.Error()
 }
 
-// Format a table.
+// Format a table. This updates each column base type to its weakest base type and updates each column width to the largest each needs to be when formated as a string.
 func (t *Table) Format() {
+	// Reset each column format as an integer and to be as wide as the column
+	// header. Each column base type is used to determine alignment and doesn't
+	// affect the formatting of each (i,j)th value.
 	for i := 0; i < t.columns; i++ {
 		t.colBaseTypes[i] = integerType
 		t.colWidths[i] = len(t.header[i])
@@ -195,19 +223,28 @@ func (t *Table) Format() {
 		w  int
 	)
 
-	for i := 0; i < t.rows; i++ {
-		for j := 0; j < t.columns; j++ {
-			if bt = baseTypeOf(t.body[i][j]); bt < t.colBaseTypes[j] {
+	for _, r := range t.body {
+		for j, v := range r {
+			// Set the jth column base type to the minimum (weakest) base type
+			// found in each value at (i,j). Recall from base_type.go that
+			// strings < floats < ints. Then update the jth column width
+			// depending on the weakest base type found.
+
+			// minColBaseType is not appropriate here because the (i,j)th value
+			// is not reset in dependence on the minimum column base type
+			// returned.
+			if bt = baseTypeOf(v); bt < t.colBaseTypes[j] {
 				t.colBaseTypes[j] = bt
 			}
 
+			// Determine the width of the (i,j)th value when converted to its base type and update the column width if the column width is too small to support it.
 			switch bt {
 			case integerType:
-				w = len(strconv.Itoa(t.body[i][j].(int)))
+				w = len(strconv.Itoa(v.(int)))
 			case floatType:
-				w = len(strconv.FormatFloat(t.body[i][j].(float64), byte(t.floatFmt), int(t.floatPrecision), 64))
+				w = len(strconv.FormatFloat(v.(float64), byte(t.floatFmt), int(t.floatPrecision), 64))
 			case stringType:
-				w = len(t.body[i][j].(string))
+				w = len(v.(string))
 			default:
 				panic("unknown base type")
 			}
@@ -224,34 +261,14 @@ func (t *Table) Get(i, j int) interface{} {
 	return t.body[i][j]
 }
 
-// GetColumn returns the column header and a copy of the column at a given index.
-func (t *Table) GetColumn(i int) (string, Column) {
-	c := make(Column, 0, len(t.body))
-	for _, r := range t.body {
-		c = append(c, r[i])
-	}
-
-	return t.header[i], c
-}
-
-// GetColumnHeader at a given index.
-func (t *Table) GetColumnHeader(i int) string {
-	return t.header[i]
-}
-
-// GetHeader returns a copy of the header.
-func (t *Table) GetHeader() Header {
+// Header returns a copy of the header.
+func (t *Table) Header() Header {
 	return t.header.Copy()
 }
 
-// GetRow returns a copy of a row.
-func (t *Table) GetRow(i int) Row {
-	return t.body[i].Copy()
-}
-
-// ImportFromCSV imports a csv file into a table and returns it.
-func ImportFromCSV(reader *csv.Reader, tableName string, fltFmt FltFmt, fltPrec FltPrecFmt) (Table, error) {
-	t := New(tableName, fltFmt, fltPrec, 0, 0)
+// Import imports a csv file into a table and returns it.
+func Import(reader *csv.Reader, tableName string, fltFmt FltFmt, fltPrec FltPrecFmt) (Table, error) {
+	t := New(tableName, fltFmt, fltPrec)
 
 	// Header
 	line, err := reader.Read()
@@ -281,6 +298,22 @@ func ImportFromCSV(reader *csv.Reader, tableName string, fltFmt FltFmt, fltPrec 
 
 		t.AppendRow(r)
 	}
+}
+
+// minColBaseType returns the smallest base type found in column j.
+func (t *Table) minColBaseType(j int) baseType {
+	var (
+		min = integerType
+		bt  baseType
+	)
+
+	for _, r := range t.body {
+		if bt = baseTypeOf(r[j]); bt < min {
+			min = bt
+		}
+	}
+
+	return min
 }
 
 // RemoveColumn from a table.
@@ -332,6 +365,11 @@ func (t *Table) RemoveRow(i int) Row {
 	return r
 }
 
+// Row returns a copy of a row.
+func (t *Table) Row(i int) Row {
+	return t.body[i].Copy()
+}
+
 // Set the (i,j)th cell to a given value.
 func (t *Table) Set(v interface{}, i, j int) {
 	t.body[i][j] = v
@@ -342,8 +380,8 @@ func (t *Table) SetColumnHeader(columnHeader string, i int) {
 	t.header[i] = strings.TrimSpace(columnHeader)
 }
 
-// setColumns to a given size n.
-func (t *Table) setColumns(n int) {
+// setColSize to a given size n. Empty strings will be appended.
+func (t *Table) setColSize(n int) {
 	t.columns = n
 	for len(t.header) < n {
 		t.header = append(t.header, "")
@@ -380,10 +418,21 @@ func (t *Table) setColumns(n int) {
 	}
 }
 
+// SetFloatFmt defines how float values are displayed, if any are present.
+func (t *Table) SetFloatFmt(f FltFmt) {
+	t.floatFmt = f
+}
+
+// SetFloatPrecFmt defines how many digits will be displayed after a decimal
+// value, if any are present.
+func (t *Table) SetFloatPrecFmt(f FltPrecFmt) {
+	t.floatPrecision = f
+}
+
 // SetHeader sets the header field.
 func (t *Table) SetHeader(h Header) {
 	n := len(h)
-	t.setColumns(n)
+	t.setColSize(n)
 
 	var w int
 	for i := 0; i < n; i++ {
@@ -396,19 +445,17 @@ func (t *Table) SetHeader(h Header) {
 }
 
 // SetMinFormat for each table value within the context of its column format.
+// That is, this sets the (i,j)th entry to the base type found in each column.
+// WARNING: This will wipe out the original data and cannot be undone.
 func (t *Table) SetMinFormat() {
-	var (
-		bt baseType
-		x  string
-	)
+	for j := 0; j < t.columns; j++ {
+		t.colBaseTypes[j] = t.minColBaseType(j)
+	}
 
 	for i := 0; i < t.rows; i++ {
 		for j := 0; j < t.columns; j++ {
-			if bt = baseTypeOf(t.body[i][j]); bt < t.colBaseTypes[j] {
-				t.colBaseTypes[j] = bt
-			}
-
-			switch bt {
+			// Update each (i,j)th value to the jth column base type.
+			switch baseTypeOf(t.body[i][j]) {
 			case integerType:
 				switch t.colBaseTypes[j] {
 				case integerType: // Do nothing
@@ -424,8 +471,7 @@ func (t *Table) SetMinFormat() {
 				case integerType: // Do nothing? Data loss if we convert float to int
 				case floatType: // Do nothing
 				case stringType:
-					x = strconv.FormatFloat(t.body[i][j].(float64), 'f', -1, 64)
-					if strings.ContainsRune(x, '.') {
+					if x := strconv.FormatFloat(t.body[i][j].(float64), 'f', -1, 64); strings.ContainsRune(x, '.') {
 						t.body[i][j] = x
 					} else {
 						t.body[i][j] = x + ".0"

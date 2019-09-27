@@ -35,6 +35,6 @@ func baseTypeOf(x interface{}) baseType {
 	case string:
 		return stringType
 	default:
-		panic("unknown type")
+		return 0 // unknown base type
 	}
 }

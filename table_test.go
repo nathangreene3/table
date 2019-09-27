@@ -17,7 +17,7 @@ func TestImportExportCSV(t *testing.T) {
 	}
 	defer inFile.Close()
 
-	table, err := ImportFromCSV(csv.NewReader(inFile), "star wars", FltFmtNoExp, 3)
+	table, err := Import(csv.NewReader(inFile), "star wars", FltFmtNoExp, 3)
 	if err != nil {
 		t.Fatalf("%v", err)
 	}
@@ -28,7 +28,7 @@ func TestImportExportCSV(t *testing.T) {
 	}
 	defer outFile.Close()
 
-	if err = table.ExportToCSV(csv.NewWriter(outFile)); err != nil {
+	if err = table.Export(csv.NewWriter(outFile)); err != nil {
 		t.Fatalf("%v", err)
 	}
 
@@ -40,7 +40,7 @@ func TestTable1(t *testing.T) {
 		left, right    int
 		xFacts, yFacts string
 		n              = 1 << 10
-		tbl            = New("", FltFmtNoExp, 0, n, 6)
+		tbl            = New("Squared-Triangle Numbers", FltFmtNoExp, 0)
 	)
 
 	tbl.SetHeader(Header{"x", "y", "(x^2+x)/2", "y^2", "Facts of x", "Facts of y"})
@@ -73,7 +73,7 @@ func TestTable2(t *testing.T) {
 	var (
 		x0, y0, x0to2, y0to2, x1to2 float64
 		numRows                     = 10
-		tbl                         = New("", FltFmtNoExp, 0, numRows, 4)
+		tbl                         = New("", 0, 0)
 	)
 
 	tbl.SetHeader(Header{"k", "x", "y", "x^2 - 2y^2"})
