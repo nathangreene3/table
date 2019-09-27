@@ -3,6 +3,7 @@ package table
 import (
 	"encoding/csv"
 	"fmt"
+	gomath "math"
 	"os"
 	"testing"
 
@@ -34,7 +35,7 @@ func TestImportExportCSV(t *testing.T) {
 	// t.Fatalf("\n%s", table.String())
 }
 
-func TestTable(t *testing.T) {
+func TestTable1(t *testing.T) {
 	var (
 		left, right    int
 		xFacts, yFacts string
@@ -63,6 +64,26 @@ func TestTable(t *testing.T) {
 				tbl.AppendRow(Row{x, y, left, right, xFacts, yFacts})
 			}
 		}
+	}
+
+	// t.Fatalf("\n%s\n", tbl.String())
+}
+
+func TestTable2(t *testing.T) {
+	var (
+		x0, y0, x0to2, y0to2, x1to2 float64
+		numRows                     = 10
+		tbl                         = New("", FltFmtNoExp, 0, numRows, 4)
+	)
+
+	tbl.SetHeader(Header{"k", "x", "y", "x^2 - 2y^2"})
+	x0 = 1
+	for k := 0; k < numRows; k++ {
+		x0to2, y0to2 = x0*x0, y0*y0
+		tbl.AppendRow(NewRow(k, x0, y0, x0to2-2*y0to2))
+
+		x1to2 = 3.0*x0to2 + 4.0*x0*y0
+		x0, y0 = gomath.Sqrt(x1to2), gomath.Sqrt((x1to2-x0to2)/2.0+y0to2)
 	}
 
 	// t.Fatalf("\n%s\n", tbl.String())
