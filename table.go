@@ -43,8 +43,8 @@ func New(name string, floatFmt FltFmt, floatPrec FltPrecFmt) Table {
 	}
 
 	var (
-		maxRows = 1 << 8
-		maxCols = 1 << 8
+		maxRows = 256
+		maxCols = 256
 	)
 
 	return Table{
@@ -375,8 +375,8 @@ func (t *Table) Set(v interface{}, i, j int) {
 	t.body[i][j] = v
 }
 
-// SetColumnHeader to a given value.
-func (t *Table) SetColumnHeader(columnHeader string, i int) {
+// SetColHeader to a given value.
+func (t *Table) SetColHeader(columnHeader string, i int) {
 	t.header[i] = strings.TrimSpace(columnHeader)
 }
 

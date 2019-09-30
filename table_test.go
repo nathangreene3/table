@@ -73,7 +73,7 @@ func TestTable2(t *testing.T) {
 	var (
 		x0, y0, x0to2, y0to2, x1to2 float64
 		numRows                     = 10
-		tbl                         = New("", 0, 0)
+		tbl                         = New("Solutions to Pell's Equation for n = 2", 0, 3)
 	)
 
 	tbl.SetHeader(Header{"k", "x", "y", "x^2 - 2y^2"})
@@ -86,5 +86,25 @@ func TestTable2(t *testing.T) {
 		x0, y0 = gomath.Sqrt(x1to2), gomath.Sqrt((x1to2-x0to2)/2.0+y0to2)
 	}
 
-	// t.Fatalf("\n%s\n", tbl.String())
+	t.Fatalf("\n%s\n", tbl.String())
+}
+
+func TestApproxSqrt2(t *testing.T) {
+	var (
+		x0, y0, x0to2, y0to2, x1to2 float64
+		numRows                     = 10
+		tbl                         = New("Approximations of sqrt(2)", 0, 9)
+	)
+
+	tbl.SetHeader(Header{"k", "x", "y", "~sqrt(2)"})
+	x0 = 1
+	for k := 0; k < numRows; k++ {
+		x0to2, y0to2 = x0*x0, y0*y0
+		tbl.AppendRow(NewRow(k, x0, y0, gomath.Sqrt(x0to2-1)/y0))
+
+		x1to2 = 3.0*x0to2 + 4.0*x0*y0
+		x0, y0 = gomath.Sqrt(x1to2), gomath.Sqrt((x1to2-x0to2)/2.0+y0to2)
+	}
+
+	t.Fatalf("\n%s\n", tbl.String())
 }
