@@ -2,7 +2,6 @@ package table
 
 import (
 	"encoding/csv"
-	"io"
 	"strconv"
 	"strings"
 )
@@ -195,7 +194,7 @@ func (t *Table) Dimensions() (int, int) {
 }
 
 // Export to a csv writer. Table will be cleaned and set to minimum format.
-func (t *Table) Export(writer *csv.Writer) error {
+func (t *Table) Export(writer csv.Writer) error {
 	t.Clean()
 	t.SetMinFormat()
 
@@ -267,30 +266,23 @@ func (t *Table) Header() Header {
 }
 
 // Import imports a csv file into a table and returns it.
-func Import(reader *csv.Reader, tableName string, fltFmt FltFmt, fltPrec FltPrecFmt) (Table, error) {
-	t := New(tableName, fltFmt, fltPrec)
+func Import(reader csv.Reader, tableName string, fltFmt FltFmt, fltPrec FltPrecFmt) (Table, error) {
+	var (
+		t          = New(tableName, fltFmt, fltPrec)
+		lines, err = reader.ReadAll()
+		n          = len(lines)
+	)
 
-	// Header
-	line, err := reader.Read()
-	if err != nil {
-		if err != io.EOF {
-			return t, err
-		}
-		return t, nil
+	if err != nil || n == 0 {
+		return t, err // No header, no body
 	}
 
-	t.SetHeader(line)
+	t.SetHeader(lines[0])
+	if n == 1 {
+		return t, nil // No body
+	}
 
-	// Body
-	for {
-		line, err = reader.Read()
-		if err != nil {
-			if err != io.EOF {
-				return t, err
-			}
-			return t, nil
-		}
-
+	for _, line := range lines[1:] {
 		r := make(Row, 0, len(line))
 		for _, s := range line {
 			r = append(r, toBaseType(s))
@@ -298,6 +290,8 @@ func Import(reader *csv.Reader, tableName string, fltFmt FltFmt, fltPrec FltPrec
 
 		t.AppendRow(r)
 	}
+
+	return t, nil
 }
 
 // minColBaseType returns the smallest base type found in column j.
