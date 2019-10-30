@@ -5,6 +5,8 @@ import (
 	"fmt"
 	gomath "math"
 	"os"
+	"sort"
+	"strings"
 	"testing"
 
 	"github.com/nathangreene3/math"
@@ -36,36 +38,47 @@ func TestImportExportCSV(t *testing.T) {
 }
 
 func TestTable1(t *testing.T) {
+	type factPow struct {
+		factor, power int
+	}
+
 	var (
-		xFacts, yFacts string
-		n              = 1 << 10
-		tbl            = New("Squared-Triangle Numbers", FltFmtNoExp, 0)
-	)
-
-	tbl.SetHeader(Header{"x", "y", "(x^2+x)/2", "y^2", "Facts of x", "Facts of y"})
-	for x := 0; x < n; x++ {
-		left := x * (x + 1) >> 1
-		if x == 0 {
-			xFacts = ""
-		} else {
-			xFacts = fmt.Sprint(math.Factor(x))
-		}
-
-		for y := 0; y < n; y++ {
-			right := y * y
-			if y == 0 {
-				yFacts = ""
-			} else {
-				yFacts = fmt.Sprint(math.Factor(y))
+		n     = 1 << 12
+		tbl   = New("Squared-Triangle Numbers", FltFmtNoExp, 0)
+		facts = func(n int) string {
+			if n < 1 {
+				return ""
 			}
 
-			if left == right {
-				tbl.AppendRow(Row{x, y, left, right, xFacts, yFacts})
+			var (
+				fs      = math.Factor(n)
+				factors = make([]string, 0, len(fs))
+			)
+
+			for fact, pow := range fs {
+				factors = append(factors, fmt.Sprintf("%d^%d", fact, pow))
+			}
+
+			sort.Strings(factors)
+			return strings.Join(factors, " * ")
+		}
+	)
+
+	tbl.SetHeader(Header{"x", "y", "(x^2+x)/2", "y^2", "x+y", "x-y", "x^2-y^2", "y^2-x", "facts(x)", "facts(y)"})
+	for x := 0; x < n; x++ {
+		var (
+			x2 = x * x
+			T  = (x2 + x) >> 1
+		)
+
+		for y := 0; y < n; y++ {
+			if S := y * y; T == S {
+				tbl.AppendRow(Row{x, y, T, S, x + y, x - y, x2 - S, S - x, facts(x), facts(y)})
 			}
 		}
 	}
 
-	// t.Fatalf("\n%s\n", tbl.String())
+	t.Fatalf("\n%s\n", tbl.String())
 }
 
 func TestTable2(t *testing.T) {

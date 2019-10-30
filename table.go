@@ -2,6 +2,7 @@ package table
 
 import (
 	"encoding/csv"
+	"sort"
 	"strconv"
 	"strings"
 )
@@ -143,19 +144,16 @@ func (t *Table) Clean() {
 		}
 	}
 
-	// Remove empty columns
-	var isEmpty bool
+	// Remove empty columns. Named columns are ignored.
 	for j := 0; j < t.columns; j++ {
-		if isEmpty = t.header[j] == ""; !isEmpty {
-			continue
-		}
+		if isEmpty := t.header[j] == ""; isEmpty {
+			for i := 0; i < t.rows && isEmpty; i++ {
+				isEmpty = t.body[i][j] == nil
+			}
 
-		for i := 0; i < t.rows && isEmpty; i++ {
-			isEmpty = t.body[i][j] == nil
-		}
-
-		if isEmpty {
-			t.RemoveColumn(j)
+			if isEmpty {
+				t.RemoveColumn(j)
+			}
 		}
 	}
 
@@ -479,6 +477,16 @@ func (t *Table) SetMinFormat() {
 			}
 		}
 	}
+}
+
+// Sort the table's body.
+func (t *Table) Sort() {
+	sort.Slice(t.body, func(i, j int) bool { return t.body[i].Compare(t.body[j]) < 0 })
+}
+
+// SortOnCol sorts the table body by only comparing the given column index.
+func (t *Table) SortOnCol(colIndex int) {
+	sort.Slice(t.body, func(i, j int) bool { return t.body[i].CompareAt(t.body[j], colIndex) < 0 })
 }
 
 // String returns a string-representation of a table.

@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
+
+	"github.com/nathangreene3/math"
 )
 
 // A Row is a single entry in a table.
@@ -17,6 +19,48 @@ func NewRow(values ...interface{}) Row {
 	}
 
 	return r
+}
+
+// Compare two rows by their strings representations.
+func (r Row) Compare(row Row) int {
+	var (
+		a, b     = r.Strings(), row.Strings()
+		m, n     = len(a), len(b)
+		maxIndex = math.MinInt(m, n)
+	)
+
+	for i := 0; i < maxIndex; i++ {
+		switch {
+		case a[i] < b[i]:
+			return -1
+		case b[i] < a[i]:
+			return 1
+		}
+	}
+
+	// Normally, m<n --> -1 and n<m --> 1, but here incomplete rows should be pushed to the bottom of the table.
+	// For example, [1 2 3] < [1 2] --> -1
+	switch {
+	case m < n:
+		return 1
+	case n < m:
+		return -1
+	default:
+		return 0
+	}
+}
+
+// CompareAt compares two rows by the ith value as strings.
+func (r Row) CompareAt(row Row, i int) int {
+	a, b := r.StringAt(i), row.StringAt(i)
+	switch {
+	case a < b:
+		return -1
+	case b < a:
+		return 1
+	default:
+		return 0
+	}
 }
 
 // Copy a row.
@@ -50,6 +94,20 @@ func (r Row) String() string {
 	}
 
 	return sb.String()
+}
+
+// StringAt returns the string-representation of the ith value.
+func (r Row) StringAt(i int) string {
+	switch baseTypeOf(r[i]) {
+	case integerType:
+		return strconv.Itoa(r[i].(int))
+	case floatType:
+		return strconv.FormatFloat(r[i].(float64), 'f', -1, 64)
+	case stringType:
+		return r[i].(string)
+	default:
+		return ""
+	}
 }
 
 // Strings returns the row formatted as []string.
