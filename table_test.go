@@ -3,7 +3,7 @@ package table
 import (
 	"encoding/csv"
 	"fmt"
-	gomath "math"
+	"math/rand"
 	"os"
 	"sort"
 	"strings"
@@ -33,90 +33,77 @@ func TestImportExportCSV(t *testing.T) {
 	if err = table.Export(*csv.NewWriter(outFile)); err != nil {
 		t.Fatalf("%v", err)
 	}
-
 	// t.Fatalf("\n%s", table.String())
 }
 
-func TestTable1(t *testing.T) {
+func TestTable(t *testing.T) {
 	type factPow struct {
 		factor, power int
 	}
 
-	var (
-		n     = 1 << 12
-		tbl   = New("Squared-Triangle Numbers", FltFmtNoExp, 0)
-		facts = func(n int) string {
-			if n < 1 {
-				return ""
-			}
-
-			var (
-				fs      = math.Factor(n)
-				factors = make([]string, 0, len(fs))
-			)
-
-			for fact, pow := range fs {
-				factors = append(factors, fmt.Sprintf("%d^%d", fact, pow))
-			}
-
-			sort.Strings(factors)
-			return strings.Join(factors, " * ")
+	factorsStr := func(n int) string {
+		if n < 1 {
+			return ""
 		}
-	)
 
-	tbl.SetHeader(Header{"x", "y", "(x^2+x)/2", "y^2", "x+y", "x-y", "x^2-y^2", "y^2-x", "facts(x)", "facts(y)"})
-	for x := 0; x < n; x++ {
 		var (
-			x2 = x * x
-			T  = (x2 + x) >> 1
+			factors  = math.Factor(n)
+			factPows = make([]factPow, 0, len(factors))
 		)
 
+		for factor, power := range factors {
+			factPows = append(factPows, factPow{factor: factor, power: power})
+		}
+
+		sort.Slice(
+			factPows,
+			func(i, j int) bool {
+				switch {
+				case factPows[i].factor < factPows[j].factor:
+					return true
+				case factPows[i].factor == factPows[j].factor:
+					return factPows[i].power < factPows[j].power
+				default:
+					return false
+				}
+			},
+		)
+
+		s := make([]string, 0, len(factors))
+		for _, fs := range factPows {
+			s = append(s, fmt.Sprintf("%d^%d", fs.factor, fs.power))
+		}
+
+		return strings.Join(s, " * ")
+	}
+
+	var (
+		index int
+		n     = 1 << 16
+		tbl   = New("Squared-Triangle Numbers", FltFmtNoExp, 0)
+	)
+
+	tbl.SetHeader(NewHeader("index", "x", "y", "x+y", "x-y", "y^2-x", "facts(x+y)", "facts(x-y)", "gcd(x+y, x-y)"))
+	for x := 0; x < n; x++ {
+		T := (x*x + x) >> 1
 		for y := 0; y < n; y++ {
 			if S := y * y; T == S {
-				tbl.AppendRow(Row{x, y, T, S, x + y, x - y, x2 - S, S - x, facts(x), facts(y)})
+				tbl.AppendRow(NewRow(index, x, y, x+y, x-y, S-x, factorsStr(x+y), factorsStr(x-y), math.GCD(x+y, x-y)))
+				index++
 			}
 		}
 	}
 
-	t.Fatalf("\n%s\n", tbl.String())
+	// t.Fatalf("\n%s\n", tbl.String())
 }
 
-func TestTable2(t *testing.T) {
-	var (
-		x0, y0, x0to2, y0to2, x1to2 float64
-		numRows                     = 10
-		tbl                         = New("Solutions to Pell's Equation for n = 2", 0, 3)
-	)
-
-	tbl.SetHeader(Header{"k", "x", "y", "x^2 - 2y^2"})
-	x0 = 1
-	for k := 0; k < numRows; k++ {
-		x0to2, y0to2 = x0*x0, y0*y0
-		tbl.AppendRow(NewRow(k, x0, y0, x0to2-2*y0to2))
-
-		x1to2 = 3.0*x0to2 + 4.0*x0*y0
-		x0, y0 = gomath.Sqrt(x1to2), gomath.Sqrt((x1to2-x0to2)/2.0+y0to2)
+func TestSort(t *testing.T) {
+	tbl := New("Sorted", FltFmtNoExp, 0)
+	tbl.SetHeader(NewHeader("index", "letters", "numbers"))
+	for i := 0; i < 10; i++ {
+		tbl.AppendRow(NewRow(i, string('a'+byte(rand.Intn(26))), rand.Intn(10)))
 	}
 
-	t.Fatalf("\n%s\n", tbl.String())
-}
-
-func TestApproxSqrt2(t *testing.T) {
-	var (
-		x0, y0, x0to2, y0to2, x1to2 float64
-		numRows                     = 10
-		tbl                         = New("Approximations of sqrt(2)", 0, 9)
-	)
-
-	tbl.SetHeader(Header{"k", "x", "y", "~sqrt(2)"})
-	x0 = 1
-	for k := 0; k < numRows; k++ {
-		x0to2, y0to2 = x0*x0, y0*y0
-		tbl.AppendRow(NewRow(k, x0, y0, gomath.Sqrt(x0to2-1)/y0))
-
-		x1to2 = 3.0*x0to2 + 4.0*x0*y0
-		x0, y0 = gomath.Sqrt(x1to2), gomath.Sqrt((x1to2-x0to2)/2.0+y0to2)
-	}
-
-	t.Fatalf("\n%s\n", tbl.String())
+	tbl.SortOnCol(1)
+	// t.Fatalf("\n%s\n", tbl.String())
 }

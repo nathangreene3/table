@@ -42,17 +42,13 @@ func New(name string, floatFmt FltFmt, floatPrec FltPrecFmt) Table {
 		floatFmt = FltFmtNoExp
 	}
 
-	var (
-		maxRows = 256
-		maxCols = 256
-	)
-
+	maxSize := 1 << 8
 	return Table{
 		Name:           name,
-		header:         make(Header, 0, maxCols),
-		body:           make([]Row, 0, maxRows),
-		colBaseTypes:   make([]baseType, 0, maxCols),
-		colWidths:      make([]int, 0, maxCols),
+		header:         make(Header, 0, maxSize),
+		body:           make([]Row, 0, maxSize),
+		colBaseTypes:   make([]baseType, 0, maxSize),
+		colWidths:      make([]int, 0, maxSize),
 		floatPrecision: floatPrec,
 		floatFmt:       floatFmt,
 	}
