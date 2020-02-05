@@ -51,7 +51,7 @@ func (h Header) Copy() Header {
 
 // isEmpty ...
 func (h Header) isEmpty() bool {
-	for _, v := range header {
+	for _, v := range h {
 		if len(v) != 0 {
 			return false
 		}
