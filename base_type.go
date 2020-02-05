@@ -1,19 +1,23 @@
 package table
 
-import "strconv"
+import (
+	"strconv"
+	"strings"
+)
 
 // baseType indicates the basic underlying type of a interface{} value.
 type baseType byte
 
 const (
-	stringType baseType = 1 + iota
-	floatType
-	integerType
+	unknownType baseType = iota // 0
+	stringType                  // 1
+	floatType                   // 2
+	integerType                 // 3
 )
 
-// toBaseType converts a string to the first type it converts to successfully.
+// parse converts a string to the first type it converts to successfully.
 // Preference is given as int, float64, string.
-func toBaseType(s string) interface{} {
+func parse(s string) interface{} {
 	if n, err := strconv.Atoi(s); err == nil {
 		return n
 	}
@@ -35,6 +39,24 @@ func baseTypeOf(x interface{}) baseType {
 	case string:
 		return stringType
 	default:
-		return 0 // unknown base type
+		return unknownType
+	}
+}
+
+// toString converts an interface{} to a string.
+func toString(x interface{}) string {
+	switch baseTypeOf(x) {
+	case integerType:
+		return strconv.Itoa(x.(int))
+	case floatType:
+		f := strconv.FormatFloat(x.(float64), 'f', -1, 64)
+		if strings.ContainsRune(f, '.') {
+			return f
+		}
+		return f + ".0"
+	case stringType:
+		return x.(string)
+	default:
+		panic("unknown base type")
 	}
 }

@@ -1,8 +1,6 @@
 package table
 
 import (
-	"fmt"
-	"strconv"
 	"strings"
 
 	"github.com/nathangreene3/math"
@@ -13,11 +11,8 @@ type Row []interface{}
 
 // NewRow converts various items to a row.
 func NewRow(values ...interface{}) Row {
-	r := make(Row, 0, len(values))
-	for _, v := range values {
-		r = append(r, v)
-	}
-
+	r := make(Row, len(values))
+	copy(r, values)
 	return r
 }
 
@@ -38,8 +33,9 @@ func (r Row) Compare(row Row) int {
 		}
 	}
 
-	// Normally, m<n --> -1 and n<m --> 1, but here incomplete rows should be pushed to the bottom of the table.
-	// For example, [1 2 3] < [1 2] --> -1
+	// Normally, m<n --> -1 and n<m --> 1, but here incomplete rows
+	// should be pushed to the bottom of the table. For example,
+	// [1 2 3] < [1 2] --> -1
 	switch {
 	case m < n:
 		return 1
@@ -52,27 +48,21 @@ func (r Row) Compare(row Row) int {
 
 // CompareAt compares two rows by the ith value as strings.
 func (r Row) CompareAt(row Row, i int) int {
-	a, b := r.StringAt(i), row.StringAt(i)
-	switch {
-	case a < b:
-		return -1
-	case b < a:
-		return 1
-	default:
-		return 0
-	}
+	return strings.Compare(r.StringAt(i), row.StringAt(i))
 }
 
 // Copy a row.
 func (r Row) Copy() Row {
-	cpy := make(Row, len(r))
-	copy(cpy, r)
-	return cpy
+	return NewRow(r...)
 }
 
 // isEmpty determines if a row contains data or not.
 func (r Row) isEmpty() bool {
 	for _, v := range r {
+		if v == nil {
+			continue
+		}
+
 		switch baseTypeOf(v) {
 		case integerType, floatType:
 			return false
@@ -88,47 +78,25 @@ func (r Row) isEmpty() bool {
 
 // String returns a string-representation of a row.
 func (r Row) String() string {
-	var sb strings.Builder
-	for _, v := range r {
-		sb.WriteString(fmt.Sprintf("%v", v))
-	}
-
-	return sb.String()
+	return strings.Join(r.Strings(), ",")
 }
 
 // StringAt returns the string-representation of the ith value.
 func (r Row) StringAt(i int) string {
-	switch baseTypeOf(r[i]) {
-	case integerType:
-		return strconv.Itoa(r[i].(int))
-	case floatType:
-		return strconv.FormatFloat(r[i].(float64), 'f', -1, 64)
-	case stringType:
-		return r[i].(string)
-	default:
-		return ""
-	}
+	return toString(r[i])
 }
 
 // Strings returns the row formatted as []string.
 func (r Row) Strings() []string {
 	s := make([]string, 0, len(r))
 	for _, v := range r {
-		switch baseTypeOf(v) {
-		case integerType:
-			s = append(s, strconv.Itoa(v.(int)))
-		case floatType:
-			if x := strconv.FormatFloat(v.(float64), 'f', -1, 64); strings.ContainsRune(x, '.') {
-				s = append(s, x)
-			} else {
-				s = append(s, x+".0")
-			}
-		case stringType:
-			s = append(s, v.(string))
-		default:
-			panic("uknown base type")
-		}
+		s = append(s, toString(v))
 	}
 
 	return s
+}
+
+// Swap ...
+func (r Row) Swap(i, j int) {
+	r[i], r[j] = r[j], r[i]
 }

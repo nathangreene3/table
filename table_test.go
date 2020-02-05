@@ -1,7 +1,6 @@
 package table
 
 import (
-	"encoding/csv"
 	"fmt"
 	"math/rand"
 	"os"
@@ -12,14 +11,14 @@ import (
 	"github.com/nathangreene3/math"
 )
 
-func TestImportExportCSV(t *testing.T) {
+func TestImportExport(t *testing.T) {
 	inFile, err := os.Open("test0.csv")
 	if err != nil {
 		t.Fatalf("%v", err)
 	}
 	defer inFile.Close()
 
-	table, err := Import(*csv.NewReader(inFile), "star wars", FltFmtNoExp, 3)
+	table, err := Import(inFile, "star wars", FltFmtNoExp, 3)
 	if err != nil {
 		t.Fatalf("%v", err)
 	}
@@ -30,9 +29,10 @@ func TestImportExportCSV(t *testing.T) {
 	}
 	defer outFile.Close()
 
-	if err = table.Export(*csv.NewWriter(outFile)); err != nil {
+	if err = table.Export(outFile); err != nil {
 		t.Fatalf("%v", err)
 	}
+
 	// t.Fatalf("\n%s", table.String())
 }
 
@@ -80,10 +80,9 @@ func TestTable(t *testing.T) {
 	var (
 		index int
 		n     = 1 << 16
-		tbl   = New("Squared-Triangle Numbers", FltFmtNoExp, 0)
+		tbl   = New("Squared-Triangle Numbers", FltFmtNoExp, 0).SetHeader(NewHeader("index", "x", "y", "x+y", "x-y", "y^2-x", "facts(x+y)", "facts(x-y)", "gcd(x+y, x-y)"))
 	)
 
-	tbl.SetHeader(NewHeader("index", "x", "y", "x+y", "x-y", "y^2-x", "facts(x+y)", "facts(x-y)", "gcd(x+y, x-y)"))
 	for x := 0; x < n; x++ {
 		T := (x*x + x) >> 1
 		for y := 0; y < n; y++ {
@@ -98,8 +97,7 @@ func TestTable(t *testing.T) {
 }
 
 func TestSort(t *testing.T) {
-	tbl := New("Sorted", FltFmtNoExp, 0)
-	tbl.SetHeader(NewHeader("index", "letters", "numbers"))
+	tbl := New("Sorted", FltFmtNoExp, 0).SetHeader(NewHeader("index", "letters", "numbers"))
 	for i := 0; i < 10; i++ {
 		tbl.AppendRow(NewRow(i, string('a'+byte(rand.Intn(26))), rand.Intn(10)))
 	}

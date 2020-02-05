@@ -1,12 +1,55 @@
 package table
 
 import (
-	"fmt"
 	"strings"
+
+	"github.com/nathangreene3/math"
 )
 
 // A Column is a collection of the ith values in a body of rows.
 type Column []interface{}
+
+// NewColumn ...
+func NewColumn(values ...interface{}) Column {
+	c := make(Column, len(values))
+	copy(c, values)
+	return c
+}
+
+// Compare two rows by their strings representations.
+func (c Column) Compare(col Column) int {
+	var (
+		a, b     = c.Strings(), col.Strings()
+		m, n     = len(a), len(b)
+		maxIndex = math.MinInt(m, n)
+	)
+
+	for i := 0; i < maxIndex; i++ {
+		switch {
+		case a[i] < b[i]:
+			return -1
+		case b[i] < a[i]:
+			return 1
+		}
+	}
+
+	// Normally, m<n --> -1 and n<m --> 1, but here incomplete rows
+	// should be pushed to the bottom of the table. For example,
+	// [1 2 3] < [1 2] --> -1
+	switch {
+	case m < n:
+		return 1
+	case n < m:
+		return -1
+	default:
+		return 0
+	}
+}
+
+// CompareAt compares two rows by the ith value as strings.
+func (c Column) CompareAt(col Column, i int) int {
+	strings.Compare(c.StringAt(i), col.StringAt(i))
+}
 
 // Copy a column.
 func (c Column) Copy() Column {
@@ -15,12 +58,47 @@ func (c Column) Copy() Column {
 	return cpy
 }
 
-// String returns a string-representation of a column.
-func (c Column) String() string {
-	sb := strings.Builder{}
-	for i := range c {
-		sb.WriteString(fmt.Sprintf("%v", c[i]))
+// isEmpty determines if a column contains data or not.
+func (c Column) isEmpty() bool {
+	for _, v := range c {
+		if v == nil {
+			continue
+		}
+
+		switch baseTypeOf(v) {
+		case integerType, floatType:
+			return false
+		case stringType:
+			if 0 < len(v.(string)) {
+				return false
+			}
+		}
 	}
 
-	return sb.String()
+	return true
+}
+
+// String returns a string-representation of a column.
+func (c Column) String() string {
+	return strings.Join(c.Strings(), ",")
+}
+
+// StringAt returns the string-representation of the ith value.
+func (c Column) StringAt(i int) string {
+	return toString(c[i])
+}
+
+// Strings ...
+func (c Column) Strings() []string {
+	s := make([]string, 0, len(c))
+	for _, v := range c {
+		s = append(s, toString(v))
+	}
+
+	return s
+}
+
+// Swap ...
+func (c Column) Swap(i, j int) {
+	c[i], c[j] = c[j], c[i]
 }

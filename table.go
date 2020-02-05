@@ -2,6 +2,7 @@ package table
 
 import (
 	"encoding/csv"
+	"io"
 	"sort"
 	"strconv"
 	"strings"
@@ -9,11 +10,11 @@ import (
 
 // A Table holds rows/columns of data.
 type Table struct {
-	Name           string
 	header         Header
-	body           []Row
+	body           Body
 	colBaseTypes   []baseType
 	colWidths      []int
+	Name           string
 	rows, columns  int
 	floatPrecision FltPrecFmt
 	floatFmt       FltFmt
@@ -22,7 +23,8 @@ type Table struct {
 // FltFmt defines formatting float values.
 type FltFmt byte
 
-// FltPrecFmt defines the number of decimal positions displayed for float values.
+// FltPrecFmt defines the number of decimal positions displayed
+// for float values.
 type FltPrecFmt int
 
 const (
@@ -37,25 +39,26 @@ const (
 )
 
 // New returns an empty table.
-func New(name string, floatFmt FltFmt, floatPrec FltPrecFmt) Table {
+func New(name string, floatFmt FltFmt, floatPrec FltPrecFmt, rows ...Row) *Table {
 	if floatFmt == 0 {
 		floatFmt = FltFmtNoExp
 	}
 
-	maxSize := 1 << 8
-	return Table{
+	t := &Table{
 		Name:           name,
-		header:         make(Header, 0, maxSize),
-		body:           make([]Row, 0, maxSize),
-		colBaseTypes:   make([]baseType, 0, maxSize),
-		colWidths:      make([]int, 0, maxSize),
+		header:         make(Header, 0),
+		body:           make(Body, 0, len(rows)),
+		colBaseTypes:   make([]baseType, 0),
+		colWidths:      make([]int, 0),
 		floatPrecision: floatPrec,
 		floatFmt:       floatFmt,
 	}
+
+	return t.AppendRows(rows...)
 }
 
 // AppendColumn to a table.
-func (t *Table) AppendColumn(columnHeader string, c Column) {
+func (t *Table) AppendColumn(columnHeader string, c Column) *Table {
 	// Increase body size to column size
 	n := len(c)
 	for t.rows < n {
@@ -74,10 +77,11 @@ func (t *Table) AppendColumn(columnHeader string, c Column) {
 	}
 
 	t.columns++
+	return t
 }
 
 // AppendRow to a table.
-func (t *Table) AppendRow(r Row) {
+func (t *Table) AppendRow(r Row) *Table {
 	n := len(r)
 	t.setColSize(n)
 	t.body = append(t.body, r)
@@ -129,10 +133,21 @@ func (t *Table) AppendRow(r Row) {
 			t.colWidths[i] = w
 		}
 	}
+
+	return t
+}
+
+// AppendRows ...
+func (t *Table) AppendRows(rows ...Row) *Table {
+	for _, r := range rows {
+		t.AppendRow(r)
+	}
+
+	return t
 }
 
 // Clean removes empty rows and columns.
-func (t *Table) Clean() {
+func (t *Table) Clean() *Table {
 	// Remove empty rows
 	for i := 0; i < t.rows; i++ {
 		if t.body[i].isEmpty() {
@@ -142,7 +157,7 @@ func (t *Table) Clean() {
 
 	// Remove empty columns. Named columns are ignored.
 	for j := 0; j < t.columns; j++ {
-		if isEmpty := t.header[j] == ""; isEmpty {
+		if isEmpty := len(t.header[j]) == 0; isEmpty {
 			for i := 0; i < t.rows && isEmpty; i++ {
 				isEmpty = t.body[i][j] == nil
 			}
@@ -153,10 +168,11 @@ func (t *Table) Clean() {
 		}
 	}
 
-	t.Format()
+	return t.Format()
 }
 
-// Column returns the column header and a copy of the column at a given index.
+// Column returns the column header and a copy of the column at a
+// given index.
 func (t *Table) Column(i int) (string, Column) {
 	c := make(Column, 0, len(t.body))
 	for _, r := range t.body {
@@ -171,14 +187,12 @@ func (t *Table) ColumnHeader(i int) string {
 	return t.header[i]
 }
 
-// Copy a table.
-func (t *Table) Copy() Table {
-	cpy := New(t.Name, t.floatFmt, t.floatPrecision)
-	cpy.SetHeader(t.header)
-	for i := 0; i < t.rows; i++ {
-		cpy.AppendRow(t.body[i].Copy())
-	}
+// TODO: t.Compare
 
+// Copy a table.
+func (t *Table) Copy() *Table {
+	cpy := New(t.Name, t.floatFmt, t.floatPrecision).SetHeader(t.header)
+	cpy.body = t.body.Copy()
 	return cpy
 }
 
@@ -187,22 +201,22 @@ func (t *Table) Dimensions() (int, int) {
 	return t.rows, t.columns
 }
 
-// Export to a csv writer. Table will be cleaned and set to minimum format.
-func (t *Table) Export(writer csv.Writer) error {
-	t.Clean()
-	t.SetMinFormat()
-
-	writer.Write([]string(t.header))
-	for _, r := range t.body {
-		writer.Write(r.Strings())
-	}
-
-	writer.Flush()
-	return writer.Error()
+// Export to a writer. Table will be cleaned and set to minimum
+// format.
+func (t *Table) Export(w io.Writer) error {
+	return t.ExportCSV(*csv.NewWriter(w))
 }
 
-// Format a table. This updates each column base type to its weakest base type and updates each column width to the largest each needs to be when formated as a string.
-func (t *Table) Format() {
+// ExportCSV to a csv writer. Table will be cleaned and set to
+// minimum format.
+func (t *Table) ExportCSV(w csv.Writer) error {
+	return w.WriteAll(t.Clean().SetMinFormat().Strings())
+}
+
+// Format a table. This updates each column base type to its
+// weakest base type and updates each column width to the largest
+// each needs to be when formated as a string.
+func (t *Table) Format() *Table {
 	// Reset each column format as an integer and to be as wide as the column
 	// header. Each column base type is used to determine alignment and doesn't
 	// affect the formatting of each (i,j)th value.
@@ -247,6 +261,8 @@ func (t *Table) Format() {
 			}
 		}
 	}
+
+	return t
 }
 
 // Get returns the (i,j)th value.
@@ -259,16 +275,25 @@ func (t *Table) Header() Header {
 	return t.header.Copy()
 }
 
-// Import imports a csv file into a table and returns it.
-func Import(reader csv.Reader, tableName string, fltFmt FltFmt, fltPrec FltPrecFmt) (Table, error) {
+// Import a reader into a table.
+func Import(r io.Reader, tableName string, fltFmt FltFmt, fltPrec FltPrecFmt) (*Table, error) {
+	return ImportCSV(*csv.NewReader(r), tableName, fltFmt, fltPrec)
+}
+
+// ImportCSV imports a csv file into a new table.
+func ImportCSV(r csv.Reader, tableName string, fltFmt FltFmt, fltPrec FltPrecFmt) (*Table, error) {
+	lines, err := r.ReadAll()
+	if err != nil {
+		return nil, err
+	}
+
 	var (
-		t          = New(tableName, fltFmt, fltPrec)
-		lines, err = reader.ReadAll()
-		n          = len(lines)
+		t = New(tableName, fltFmt, fltPrec)
+		n = len(lines)
 	)
 
-	if err != nil || n == 0 {
-		return t, err // No header, no body
+	if n == 0 {
+		return t, nil
 	}
 
 	t.SetHeader(lines[0])
@@ -279,7 +304,7 @@ func Import(reader csv.Reader, tableName string, fltFmt FltFmt, fltPrec FltPrecF
 	for _, line := range lines[1:] {
 		r := make(Row, 0, len(line))
 		for _, s := range line {
-			r = append(r, toBaseType(s))
+			r = append(r, parse(s))
 		}
 
 		t.AppendRow(r)
@@ -359,17 +384,19 @@ func (t *Table) Row(i int) Row {
 }
 
 // Set the (i,j)th cell to a given value.
-func (t *Table) Set(v interface{}, i, j int) {
+func (t *Table) Set(v interface{}, i, j int) *Table {
 	t.body[i][j] = v
+	return t
 }
 
 // SetColHeader to a given value.
-func (t *Table) SetColHeader(columnHeader string, i int) {
+func (t *Table) SetColHeader(columnHeader string, i int) *Table {
 	t.header[i] = strings.TrimSpace(columnHeader)
+	return t
 }
 
 // setColSize to a given size n. Empty strings will be appended.
-func (t *Table) setColSize(n int) {
+func (t *Table) setColSize(n int) *Table {
 	t.columns = n
 	for len(t.header) < n {
 		t.header = append(t.header, "")
@@ -404,38 +431,41 @@ func (t *Table) setColSize(n int) {
 	for n < len(t.colWidths) {
 		t.colWidths = append(t.colWidths, 0)
 	}
+
+	return t
 }
 
 // SetFloatFmt defines how float values are displayed, if any are present.
-func (t *Table) SetFloatFmt(f FltFmt) {
+func (t *Table) SetFloatFmt(f FltFmt) *Table {
 	t.floatFmt = f
+	return t
 }
 
 // SetFloatPrecFmt defines how many digits will be displayed after a decimal
 // value, if any are present.
-func (t *Table) SetFloatPrecFmt(f FltPrecFmt) {
+func (t *Table) SetFloatPrecFmt(f FltPrecFmt) *Table {
 	t.floatPrecision = f
+	return t
 }
 
 // SetHeader sets the header field.
-func (t *Table) SetHeader(h Header) {
+func (t *Table) SetHeader(h Header) *Table {
 	n := len(h)
 	t.setColSize(n)
-
-	var w int
 	for i := 0; i < n; i++ {
 		t.header[i] = strings.TrimSpace(h[i])
-		w = len(h[i])
-		if t.colWidths[i] < w {
+		if w := len(h[i]); t.colWidths[i] < w { // TODO: should this be t.header[i]?
 			t.colWidths[i] = w
 		}
 	}
+
+	return t
 }
 
 // SetMinFormat for each table value within the context of its column format.
 // That is, this sets the (i,j)th entry to the base type found in each column.
 // WARNING: This will wipe out the original data and cannot be undone.
-func (t *Table) SetMinFormat() {
+func (t *Table) SetMinFormat() *Table {
 	for j := 0; j < t.columns; j++ {
 		t.colBaseTypes[j] = t.minColBaseType(j)
 	}
@@ -473,16 +503,20 @@ func (t *Table) SetMinFormat() {
 			}
 		}
 	}
+
+	return t
 }
 
 // Sort the table's body.
-func (t *Table) Sort() {
+func (t *Table) Sort() *Table {
 	sort.Slice(t.body, func(i, j int) bool { return t.body[i].Compare(t.body[j]) < 0 })
+	return t
 }
 
 // SortOnCol sorts the table body by only comparing the given column index.
-func (t *Table) SortOnCol(colIndex int) {
+func (t *Table) SortOnCol(colIndex int) *Table {
 	sort.Slice(t.body, func(i, j int) bool { return t.body[i].CompareAt(t.body[j], colIndex) < 0 })
+	return t
 }
 
 // String returns a string-representation of a table.
@@ -536,4 +570,27 @@ func (t *Table) String() string {
 
 	sb.WriteString(hLine)
 	return sb.String()
+}
+
+// Strings returns a list of lists-of-strings representing a table.
+func (t *Table) Strings() [][]string {
+	ss := append(make([][]string, 0, t.rows+1), t.header)
+	for _, r := range t.body {
+		ss = append(ss, r.Strings())
+	}
+
+	return ss
+}
+
+// Swap ...
+func (t *Table) Swap(i, j int) {
+	t.body.Swap(i, j)
+}
+
+// SwapCols ...
+func (t *Table) SwapCols(i, j int) {
+	t.header.Swap(i, j)
+	t.body.SwapCols(i, j)
+	t.colBaseTypes[i], t.colBaseTypes[j] = t.colBaseTypes[j], t.colBaseTypes[i]
+	t.colWidths[i], t.colWidths[j] = t.colWidths[j], t.colWidths[i]
 }
