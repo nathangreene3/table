@@ -48,7 +48,7 @@ func (c Column) Compare(col Column) int {
 
 // CompareAt compares two rows by the ith value as strings.
 func (c Column) CompareAt(col Column, i int) int {
-	strings.Compare(c.StringAt(i), col.StringAt(i))
+	return strings.Compare(c.StringAt(i), col.StringAt(i))
 }
 
 // Copy a column.
