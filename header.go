@@ -16,6 +16,16 @@ func NewHeader(colNames ...string) Header {
 	return h
 }
 
+// HeaderFromBts ...
+func HeaderFromBts(colNames ...[]byte) Header {
+	h := make(Header, 0, len(colNames))
+	for _, name := range colNames {
+		h = append(h, string(name))
+	}
+
+	return h
+}
+
 // Compare ...
 func (h Header) Compare(header Header) int {
 	var (

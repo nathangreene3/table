@@ -16,6 +16,25 @@ func NewRow(values ...interface{}) Row {
 	return r
 }
 
+// RowFromBts ...
+func RowFromBts(line []byte) Row {
+	return RowFromStr(string(line))
+}
+
+// RowFromStr ...
+func RowFromStr(line string) Row {
+	var (
+		ss = strings.Split(line, ",")
+		r  = make(Row, 0, len(ss))
+	)
+
+	for _, s := range ss {
+		r = append(r, parse(s))
+	}
+
+	return r
+}
+
 // Compare two rows by their strings representations.
 func (r Row) Compare(row Row) int {
 	var (

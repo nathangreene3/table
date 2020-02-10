@@ -1,6 +1,7 @@
 package table
 
 import (
+	"bytes"
 	"fmt"
 	"math/rand"
 	"os"
@@ -11,29 +12,39 @@ import (
 	"github.com/nathangreene3/math"
 )
 
-func TestImportExport(t *testing.T) {
+func TestReadWrite(t *testing.T) {
 	inFile, err := os.Open("test0.csv")
 	if err != nil {
-		t.Fatalf("%v", err)
+		t.Fatal(err)
 	}
 	defer inFile.Close()
 
-	table, err := Import(inFile, "star wars", FltFmtNoExp, 3)
+	table, err := Import(inFile, "Test 0", FltFmtNoExp, 3)
 	if err != nil {
-		t.Fatalf("%v", err)
+		t.Fatal(err)
 	}
 
-	outFile, err := os.OpenFile("test1.csv", os.O_WRONLY, os.ModeAppend)
+	var (
+		s   = "integers,strings,floats\n4,e,4"
+		buf = bytes.NewBuffer(make([]byte, 0, len(s)))
+	)
+
+	buf.WriteString(s)
+	if _, err := table.ReadFrom(buf); err != nil {
+		t.Fatal(err)
+	}
+
+	outFile, err := os.OpenFile("test1.csv", os.O_RDWR, os.ModePerm)
 	if err != nil {
-		t.Fatalf("%v", err)
+		t.Fatal(err)
 	}
 	defer outFile.Close()
 
-	if err = table.Export(outFile); err != nil {
-		t.Fatalf("%v", err)
+	if _, err = table.WriteTo(outFile); err != nil {
+		t.Fatal(err)
 	}
 
-	// t.Fatalf("\n%s", table.String())
+	t.Fatalf("\n%s", table.String())
 }
 
 func TestTable(t *testing.T) {
