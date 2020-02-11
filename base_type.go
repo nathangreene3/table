@@ -1,6 +1,7 @@
 package table
 
 import (
+	"bytes"
 	"strconv"
 	"strings"
 )
@@ -40,6 +41,24 @@ func baseTypeOf(x interface{}) baseType {
 		return stringType
 	default:
 		return unknownType
+	}
+}
+
+// ToBytes converts an interface{} to bytes.
+func toBytes(x interface{}) []byte {
+	switch baseTypeOf(x) {
+	case integerType:
+		return []byte(strconv.Itoa(x.(int)))
+	case floatType:
+		f := []byte(strconv.FormatFloat(x.(float64), 'f', -1, 64))
+		if bytes.ContainsRune(f, '.') {
+			return f
+		}
+		return append(f, '.', '0')
+	case stringType:
+		return []byte(x.(string))
+	default:
+		panic("unknown base type")
 	}
 }
 

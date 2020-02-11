@@ -1,6 +1,7 @@
 package table
 
 import (
+	"bytes"
 	"strings"
 
 	math "github.com/nathangreene3/math"
@@ -11,19 +12,45 @@ type Header []string
 
 // NewHeader converts a list of column names to a header.
 func NewHeader(colNames ...string) Header {
-	h := make(Header, len(colNames))
-	copy(h, colNames)
+	r := strings.NewReplacer(",", "", "\n", "")
+	h := make(Header, 0, len(colNames))
+	for _, colName := range colNames {
+		h = append(h, r.Replace(colName))
+	}
+
 	return h
 }
 
 // HeaderFromBts ...
 func HeaderFromBts(colNames ...[]byte) Header {
+	r := strings.NewReplacer(",", "", "\n", "")
 	h := make(Header, 0, len(colNames))
 	for _, name := range colNames {
-		h = append(h, string(name))
+		h = append(h, r.Replace(string(name)))
 	}
 
 	return h
+}
+
+// Bytes ...
+func (h Header) Bytes() []byte {
+	if len(h) == 0 {
+		return []byte{}
+	}
+
+	var n int
+	for i := range h {
+		n += len(h[i])
+	}
+
+	buf := bytes.NewBuffer(make([]byte, 0, n))
+	buf.WriteString(h[0])
+	for i := range h[1:] {
+		buf.WriteByte(',')
+		buf.WriteString(h[i])
+	}
+
+	return buf.Bytes()
 }
 
 // Compare ...

@@ -1,6 +1,7 @@
 package table
 
 import (
+	"bytes"
 	"strings"
 
 	"github.com/nathangreene3/math"
@@ -33,6 +34,22 @@ func RowFromStr(line string) Row {
 	}
 
 	return r
+}
+
+// Bytes ...
+func (r Row) Bytes() []byte {
+	if len(r) == 0 {
+		return []byte{}
+	}
+
+	buf := bytes.NewBuffer(make([]byte, 0))
+	buf.Write(toBytes(r[0]))
+	for i := range r[1:] {
+		buf.WriteByte(',')
+		buf.Write(toBytes(r[i]))
+	}
+
+	return buf.Bytes()
 }
 
 // Compare two rows by their strings representations.
