@@ -267,27 +267,17 @@ func (t *Table) Header() Header {
 
 // Import a reader into a table.
 func Import(r io.Reader, tableName string, fltFmt FltFmt, fltPrec FltPrecFmt) (*Table, error) {
-	return ReadCSV(*csv.NewReader(r), tableName, fltFmt, fltPrec)
-}
-
-// minColBaseType returns the smallest base type found in column j.
-func (t *Table) minColBaseType(j int) baseType {
+	// return ImportCSV(*csv.NewReader(r), tableName, fltFmt, fltPrec)
 	var (
-		min = integerType
-		bt  baseType
+		t      = New(tableName, fltFmt, fltPrec)
+		_, err = t.ReadFrom(r)
 	)
 
-	for _, r := range t.body {
-		if bt = baseTypeOf(r[j]); bt < min {
-			min = bt
-		}
-	}
-
-	return min
+	return t, err
 }
 
-// ReadCSV imports a csv file into a new table.
-func ReadCSV(r csv.Reader, tableName string, fltFmt FltFmt, fltPrec FltPrecFmt) (*Table, error) {
+// ImportCSV imports a csv file into a new table.
+func ImportCSV(r csv.Reader, tableName string, fltFmt FltFmt, fltPrec FltPrecFmt) (*Table, error) {
 	lines, err := r.ReadAll()
 	if err != nil {
 		return nil, err
@@ -319,6 +309,22 @@ func ReadCSV(r csv.Reader, tableName string, fltFmt FltFmt, fltPrec FltPrecFmt) 
 	return t, nil
 }
 
+// minColBaseType returns the smallest base type found in column j.
+func (t *Table) minColBaseType(j int) baseType {
+	var (
+		min = integerType
+		bt  baseType
+	)
+
+	for _, r := range t.body {
+		if bt = baseTypeOf(r[j]); bt < min {
+			min = bt
+		}
+	}
+
+	return min
+}
+
 // Read ...
 func (t *Table) Read(b []byte) (int, error) {
 	buf := bytes.NewBuffer(make([]byte, 0, 0))
@@ -326,9 +332,7 @@ func (t *Table) Read(b []byte) (int, error) {
 		return 0, err
 	}
 
-	n := len(b)
-	copy(b, buf.Bytes()[:n])
-	return n, nil
+	return buf.Read(b)
 }
 
 // ReadFrom a reader. The reader should delimit rows with '\n' and
@@ -628,15 +632,19 @@ func (t *Table) Write(b []byte) (int, error) {
 	}
 
 	for _, ln := range lines {
+		if bytes.HasSuffix(ln, []byte{'\r'}) {
+			ln = ln[:len(ln)]
+		}
+
 		t.AppendRow(RowFromBts(ln))
 	}
 
 	return len(b), nil
 }
 
-// WriteCSV to a csv writer. Table will be cleaned and set to
+// ExportCSV to a csv writer. Table will be cleaned and set to
 // minimum format.
-func (t *Table) WriteCSV(w csv.Writer) error {
+func (t *Table) ExportCSV(w csv.Writer) error {
 	return w.WriteAll(t.Clean().SetMinFormat().Strings())
 }
 
@@ -644,7 +652,7 @@ func (t *Table) WriteCSV(w csv.Writer) error {
 // format.
 func (t *Table) WriteTo(w io.Writer) (int64, error) {
 	buf := bytes.NewBuffer(make([]byte, 0))
-	if err := t.WriteCSV(*csv.NewWriter(buf)); err != nil {
+	if err := t.ExportCSV(*csv.NewWriter(buf)); err != nil {
 		return 0, err
 	}
 
