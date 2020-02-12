@@ -22,7 +22,7 @@ type Table struct {
 	floatFmt       FltFmt
 }
 
-// FltFmt defines formatting float values.
+// FltFmt defines updateBaseTypesAndWidthsting float values.
 type FltFmt byte
 
 // FltPrecFmt defines the number of decimal positions displayed
@@ -30,13 +30,13 @@ type FltFmt byte
 type FltPrecFmt int
 
 const (
-	// FltFmtBinExp formats floats as a binary exponent value -dddp±ddd.
+	// FltFmtBinExp updateBaseTypesAndWidthss floats as a binary exponent value -dddp±ddd.
 	FltFmtBinExp FltFmt = 'b'
-	// FltFmtDecExp formats floats as a decimal exponent value (scientific notation) -d.ddde±ddd.
+	// FltFmtDecExp updateBaseTypesAndWidthss floats as a decimal exponent value (scientific notation) -d.ddde±ddd.
 	FltFmtDecExp FltFmt = 'e'
-	// FltFmtNoExp formats floats as a decimal value -ddd.ddd.
+	// FltFmtNoExp updateBaseTypesAndWidthss floats as a decimal value -ddd.ddd.
 	FltFmtNoExp FltFmt = 'f'
-	// FltFmtLrgExp formats floats as a large exponent value (scientific notation) -d.ddde±ddd.
+	// FltFmtLrgExp updateBaseTypesAndWidthss floats as a large exponent value (scientific notation) -d.ddde±ddd.
 	FltFmtLrgExp FltFmt = 'g'
 )
 
@@ -59,8 +59,13 @@ func New(name string, floatFmt FltFmt, floatPrec FltPrecFmt, rows ...Row) *Table
 	return t.AppendRows(rows...)
 }
 
-// AppendColumn to a table.
+// AppendColumn to a table. If the column header and column is empty, nothing
+// happens.
 func (t *Table) AppendColumn(columnHeader string, c Column) *Table {
+	if len(columnHeader) == 0 && c.isEmpty() {
+		return t
+	}
+
 	// Increase body size to column size
 	n := len(c)
 	for t.rows < n {
@@ -79,11 +84,16 @@ func (t *Table) AppendColumn(columnHeader string, c Column) *Table {
 	}
 
 	t.columns++
+	t.colBaseTypes[t.columns-1] = t.minColBaseType(t.columns - 1)
 	return t
 }
 
 // AppendRow to a table.
 func (t *Table) AppendRow(r Row) *Table {
+	if r.isEmpty() {
+		return t
+	}
+
 	n := len(r)
 	t.setColSize(n)
 	t.body = append(t.body, r)
@@ -141,8 +151,8 @@ func (t *Table) AppendRow(r Row) *Table {
 
 // AppendRows ...
 func (t *Table) AppendRows(rows ...Row) *Table {
-	for _, r := range rows {
-		t.AppendRow(r)
+	for i := range rows {
+		t.AppendRow(rows[i])
 	}
 
 	return t
@@ -151,14 +161,14 @@ func (t *Table) AppendRows(rows ...Row) *Table {
 // Clean removes empty rows and columns.
 func (t *Table) Clean() *Table {
 	// Remove empty rows
-	for i := 0; i < t.rows; i++ {
+	for i := t.rows - 1; 0 <= i; i-- {
 		if t.body[i].isEmpty() {
 			t.RemoveRow(i)
 		}
 	}
 
 	// Remove empty columns. Named columns are ignored.
-	for j := 0; j < t.columns; j++ {
+	for j := t.columns - 1; 0 <= j; j-- {
 		if isEmpty := len(t.header[j]) == 0; isEmpty {
 			for i := 0; i < t.rows && isEmpty; i++ {
 				isEmpty = t.body[i][j] == nil
@@ -170,7 +180,7 @@ func (t *Table) Clean() *Table {
 		}
 	}
 
-	return t.Format()
+	return t.updateBaseTypesAndWidths()
 }
 
 // Column returns the column header and a copy of the column at a
@@ -193,8 +203,7 @@ func (t *Table) ColumnHeader(i int) string {
 
 // Copy a table.
 func (t *Table) Copy() *Table {
-	cpy := New(t.Name, t.floatFmt, t.floatPrecision).SetHeader(t.header)
-	cpy.body = t.body.Copy()
+	cpy := New(t.Name, t.floatFmt, t.floatPrecision, t.body...).SetHeader(t.header)
 	return cpy
 }
 
@@ -203,13 +212,13 @@ func (t *Table) Dimensions() (int, int) {
 	return t.rows, t.columns
 }
 
-// Format a table. This updates each column base type to its
+// updateBaseTypesAndWidths a table. This updates each column base type to its
 // weakest base type and updates each column width to the largest
-// each needs to be when formated as a string.
-func (t *Table) Format() *Table {
-	// Reset each column format as an integer and to be as wide as the column
+// each needs to be when updateBaseTypesAndWidthsed as a string.
+func (t *Table) updateBaseTypesAndWidths() *Table {
+	// Reset each column updateBaseTypesAndWidths as an integer and to be as wide as the column
 	// header. Each column base type is used to determine alignment and doesn't
-	// affect the formatting of each (i,j)th value.
+	// affect the updateBaseTypesAndWidthsting of each (i,j)th value.
 	for i := 0; i < t.columns; i++ {
 		t.colBaseTypes[i] = integerType
 		t.colWidths[i] = len(t.header[i])
@@ -403,6 +412,7 @@ func (t *Table) RemoveRow(i int) Row {
 	}
 
 	t.rows--
+	t.Clean()
 	return r
 }
 
@@ -415,6 +425,15 @@ func (t *Table) Row(i int) Row {
 func (t *Table) Set(v interface{}, i, j int) *Table {
 	t.body[i][j] = v
 	return t
+}
+
+// SetBody ...
+func (t *Table) SetBody(b Body) *Table {
+	for 0 < t.rows {
+		t.RemoveRow(t.rows - 1)
+	}
+
+	return t.AppendRows(b...)
 }
 
 // SetColHeader to a given value.
@@ -490,10 +509,10 @@ func (t *Table) SetHeader(h Header) *Table {
 	return t
 }
 
-// SetMinFormat for each table value within the context of its column format.
+// SetMinupdateBaseTypesAndWidths for each table value within the context of its column updateBaseTypesAndWidths.
 // That is, this sets the (i,j)th entry to the base type found in each column.
 // WARNING: This will wipe out the original data and cannot be undone.
-func (t *Table) SetMinFormat() *Table {
+func (t *Table) SetMinupdateBaseTypesAndWidths() *Table {
 	for j := 0; j < t.columns; j++ {
 		t.colBaseTypes[j] = t.minColBaseType(j)
 	}
@@ -623,33 +642,46 @@ func (t *Table) SwapCols(i, j int) {
 	t.colWidths[i], t.colWidths[j] = t.colWidths[j], t.colWidths[i]
 }
 
+// ExportCSV to a csv writer. Table will be cleaned and set to
+// minimum updateBaseTypesAndWidths.
+func (t *Table) ExportCSV(w csv.Writer) error {
+	return w.WriteAll(t.Clean().SetMinupdateBaseTypesAndWidths().Strings())
+}
+
 // Write bytes to a table.
 func (t *Table) Write(b []byte) (int, error) {
-	lines := bytes.Split(b, []byte{'\n'})
-	if 0 < len(lines) && t.header.Compare(HeaderFromBts(bytes.Split(lines[0], []byte{','})...)) == 0 {
-		// Header was found; ignore it
+	m := len(b)
+	if m == 0 {
+		return m, nil
+	}
+
+	lines := toLines(b)
+	if t.header.isEmpty() {
+		t.header = NewHeader(lines[0]...)
+		if len(lines) < 2 {
+			return m, nil
+		}
+		lines = lines[1:]
+	} else if t.header.Compare(NewHeader(lines[0]...)) == 0 {
+		if len(lines) < 2 {
+			return m, nil
+		}
 		lines = lines[1:]
 	}
 
-	for _, ln := range lines {
-		if bytes.HasSuffix(ln, []byte{'\r'}) {
-			ln = ln[:len(ln)]
+	for i := range lines {
+		r := make(Row, 0, len(lines[i]))
+		for j := range lines[i] {
+			r = append(r, parse(lines[i][j]))
 		}
 
-		t.AppendRow(RowFromBts(ln))
+		t.AppendRow(r)
 	}
 
-	return len(b), nil
+	return m, nil
 }
 
-// ExportCSV to a csv writer. Table will be cleaned and set to
-// minimum format.
-func (t *Table) ExportCSV(w csv.Writer) error {
-	return w.WriteAll(t.Clean().SetMinFormat().Strings())
-}
-
-// WriteTo to a writer. Table will be cleaned and set to minimum
-// format.
+// WriteTo to a writer.
 func (t *Table) WriteTo(w io.Writer) (int64, error) {
 	buf := bytes.NewBuffer(make([]byte, 0))
 	if err := t.ExportCSV(*csv.NewWriter(buf)); err != nil {

@@ -1,4 +1,4 @@
-package table
+package table2
 
 import (
 	"bytes"
@@ -6,11 +6,11 @@ import (
 	"strings"
 )
 
-// baseType indicates the basic underlying type of a interface{} value.
-type baseType byte
+// BaseType indicates the basic underlying type of a interface{} value.
+type BaseType byte
 
 const (
-	unknownType baseType = iota // 0
+	unknownType BaseType = iota // 0
 	stringType                  // 1
 	floatType                   // 2
 	integerType                 // 3
@@ -31,7 +31,7 @@ func parse(s string) interface{} {
 }
 
 // baseTypeOf returns updateBaseTypesAndWidths corresponding to the underlying type of x.
-func baseTypeOf(x interface{}) baseType {
+func baseTypeOf(x interface{}) BaseType {
 	switch x.(type) {
 	case int:
 		return integerType

@@ -122,7 +122,7 @@ func (r Row) StringAt(i int) string {
 	return toString(r[i])
 }
 
-// Strings returns the row formatted as []string.
+// Strings returns the row updateBaseTypesAndWidthsted as []string.
 func (r Row) Strings() []string {
 	s := make([]string, 0, len(r))
 	for _, v := range r {

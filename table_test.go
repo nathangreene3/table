@@ -19,7 +19,9 @@ func TestReadWrite(t *testing.T) {
 	}
 	defer inFile.Close()
 
-	table, err := Import(inFile, "Test 0", FltFmtNoExp, 3)
+	// table, err := Import(inFile, "Test 0", FltFmtNoExp, 3)
+	table := New("Test 0", FltFmtNoExp, 3)
+	_, err = table.ReadFrom(inFile)
 	if err != nil {
 		t.Fatal(err)
 	}
