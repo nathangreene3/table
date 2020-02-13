@@ -3,7 +3,6 @@ package table
 import (
 	"bytes"
 	"fmt"
-	"math/rand"
 	"os"
 	"sort"
 	"strings"
@@ -106,15 +105,5 @@ func TestTable(t *testing.T) {
 		}
 	}
 
-	// t.Fatalf("\n%s\n", tbl.String())
-}
-
-func TestSort(t *testing.T) {
-	tbl := New("Sorted", FltFmtNoExp, 0).SetHeader(NewHeader("index", "letters", "numbers"))
-	for i := 0; i < 10; i++ {
-		tbl.AppendRow(NewRow(i, string('a'+byte(rand.Intn(26))), rand.Intn(10)))
-	}
-
-	tbl.SortOnCol(1)
 	// t.Fatalf("\n%s\n", tbl.String())
 }

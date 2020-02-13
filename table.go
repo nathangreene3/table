@@ -8,6 +8,8 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+
+	"github.com/nathangreene3/math"
 )
 
 // A Table holds rows/columns of data.
@@ -22,7 +24,7 @@ type Table struct {
 	floatFmt       FltFmt
 }
 
-// FltFmt defines updateBaseTypesAndWidthsting float values.
+// FltFmt determines how float values are formatted when printed.
 type FltFmt byte
 
 // FltPrecFmt defines the number of decimal positions displayed
@@ -30,13 +32,16 @@ type FltFmt byte
 type FltPrecFmt int
 
 const (
-	// FltFmtBinExp updateBaseTypesAndWidthss floats as a binary exponent value -dddp±ddd.
+	// FltFmtBinExp formats floats as a binary exponent value -dddp±ddd.
 	FltFmtBinExp FltFmt = 'b'
-	// FltFmtDecExp updateBaseTypesAndWidthss floats as a decimal exponent value (scientific notation) -d.ddde±ddd.
+
+	// FltFmtDecExp formats floats as a decimal exponent value (scientific notation) -d.ddde±ddd.
 	FltFmtDecExp FltFmt = 'e'
-	// FltFmtNoExp updateBaseTypesAndWidthss floats as a decimal value -ddd.ddd.
+
+	// FltFmtNoExp formats floats as a decimal value -ddd.ddd.
 	FltFmtNoExp FltFmt = 'f'
-	// FltFmtLrgExp updateBaseTypesAndWidthss floats as a large exponent value (scientific notation) -d.ddde±ddd.
+
+	// FltFmtLrgExp formats floats as a large exponent value (scientific notation) -d.ddde±ddd.
 	FltFmtLrgExp FltFmt = 'g'
 )
 
@@ -49,7 +54,7 @@ func New(name string, floatFmt FltFmt, floatPrec FltPrecFmt, rows ...Row) *Table
 	t := &Table{
 		Name:           name,
 		header:         make(Header, 0),
-		body:           make(Body, 0, len(rows)),
+		body:           make(Body, 0, math.NextPowOfTwo(len(rows))),
 		colBaseTypes:   make([]baseType, 0),
 		colWidths:      make([]int, 0),
 		floatPrecision: floatPrec,
@@ -429,11 +434,9 @@ func (t *Table) Set(v interface{}, i, j int) *Table {
 
 // SetBody ...
 func (t *Table) SetBody(b Body) *Table {
-	for 0 < t.rows {
-		t.RemoveRow(t.rows - 1)
-	}
-
-	return t.AppendRows(b...)
+	t.body = make(Body, 0, math.NextPowOfTwo(len(b)))
+	t.rows = 0
+	return t.Clean().AppendRows(b...)
 }
 
 // SetColHeader to a given value.
@@ -509,10 +512,10 @@ func (t *Table) SetHeader(h Header) *Table {
 	return t
 }
 
-// SetMinupdateBaseTypesAndWidths for each table value within the context of its column updateBaseTypesAndWidths.
+// SetMinFormat for each table value within the context of its column format.
 // That is, this sets the (i,j)th entry to the base type found in each column.
 // WARNING: This will wipe out the original data and cannot be undone.
-func (t *Table) SetMinupdateBaseTypesAndWidths() *Table {
+func (t *Table) SetMinFormat() *Table {
 	for j := 0; j < t.columns; j++ {
 		t.colBaseTypes[j] = t.minColBaseType(j)
 	}
@@ -642,10 +645,9 @@ func (t *Table) SwapCols(i, j int) {
 	t.colWidths[i], t.colWidths[j] = t.colWidths[j], t.colWidths[i]
 }
 
-// ExportCSV to a csv writer. Table will be cleaned and set to
-// minimum updateBaseTypesAndWidths.
+// ExportCSV to a csv writer.
 func (t *Table) ExportCSV(w csv.Writer) error {
-	return w.WriteAll(t.Clean().SetMinupdateBaseTypesAndWidths().Strings())
+	return w.WriteAll(t.Clean().Strings())
 }
 
 // Write bytes to a table.
