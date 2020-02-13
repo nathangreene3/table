@@ -2,6 +2,7 @@ package table
 
 import (
 	"bytes"
+	"encoding/csv"
 	"fmt"
 	"os"
 	"sort"
@@ -18,9 +19,7 @@ func TestReadWrite(t *testing.T) {
 	}
 	defer inFile.Close()
 
-	// table, err := Import(inFile, "Test 0", FltFmtNoExp, 3)
-	table := New("Test 0", FltFmtNoExp, 3)
-	_, err = table.ReadFrom(inFile)
+	table, err := Import(inFile, "Test 0", FltFmtNoExp, 3)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -31,17 +30,14 @@ func TestReadWrite(t *testing.T) {
 	)
 
 	buf.WriteString(s)
-	if _, err := table.ReadFrom(buf); err != nil {
-		t.Fatal(err)
-	}
-
+	table.AppendRow(RowFromBts(buf.Bytes()))
 	outFile, err := os.OpenFile("test1.csv", os.O_RDWR, os.ModePerm)
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer outFile.Close()
 
-	if _, err = table.WriteTo(outFile); err != nil {
+	if err := table.ExportCSV(*csv.NewWriter(outFile)); err != nil {
 		t.Fatal(err)
 	}
 

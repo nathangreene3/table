@@ -64,6 +64,50 @@ func New(name string, floatFmt FltFmt, floatPrec FltPrecFmt, rows ...Row) *Table
 	return t.AppendRows(rows...)
 }
 
+// Import a reader into a table.
+func Import(r io.Reader, tableName string, fltFmt FltFmt, fltPrec FltPrecFmt) (*Table, error) {
+	// return ImportCSV(*csv.NewReader(r), tableName, fltFmt, fltPrec)
+	var (
+		t      = New(tableName, fltFmt, fltPrec)
+		_, err = t.ReadFrom(r)
+	)
+
+	return t, err
+}
+
+// ImportCSV imports a csv file into a new table.
+func ImportCSV(r csv.Reader, tableName string, fltFmt FltFmt, fltPrec FltPrecFmt) (*Table, error) {
+	lines, err := r.ReadAll()
+	if err != nil {
+		return nil, err
+	}
+
+	var (
+		t = New(tableName, fltFmt, fltPrec)
+		n = len(lines)
+	)
+
+	if n == 0 {
+		return t, nil
+	}
+
+	t.SetHeader(lines[0])
+	if n == 1 {
+		return t, nil // No body
+	}
+
+	for _, line := range lines[1:] {
+		r := make(Row, 0, len(line))
+		for _, s := range line {
+			r = append(r, parse(s))
+		}
+
+		t.AppendRow(r)
+	}
+
+	return t, nil
+}
+
 // AppendColumn to a table. If the column header and column is empty, nothing
 // happens.
 func (t *Table) AppendColumn(columnHeader string, c Column) *Table {
@@ -279,50 +323,6 @@ func (t *Table) Header() Header {
 	return t.header.Copy()
 }
 
-// Import a reader into a table.
-func Import(r io.Reader, tableName string, fltFmt FltFmt, fltPrec FltPrecFmt) (*Table, error) {
-	// return ImportCSV(*csv.NewReader(r), tableName, fltFmt, fltPrec)
-	var (
-		t      = New(tableName, fltFmt, fltPrec)
-		_, err = t.ReadFrom(r)
-	)
-
-	return t, err
-}
-
-// ImportCSV imports a csv file into a new table.
-func ImportCSV(r csv.Reader, tableName string, fltFmt FltFmt, fltPrec FltPrecFmt) (*Table, error) {
-	lines, err := r.ReadAll()
-	if err != nil {
-		return nil, err
-	}
-
-	var (
-		t = New(tableName, fltFmt, fltPrec)
-		n = len(lines)
-	)
-
-	if n == 0 {
-		return t, nil
-	}
-
-	t.SetHeader(lines[0])
-	if n == 1 {
-		return t, nil // No body
-	}
-
-	for _, line := range lines[1:] {
-		r := make(Row, 0, len(line))
-		for _, s := range line {
-			r = append(r, parse(s))
-		}
-
-		t.AppendRow(r)
-	}
-
-	return t, nil
-}
-
 // minColBaseType returns the smallest base type found in column j.
 func (t *Table) minColBaseType(j int) baseType {
 	var (
@@ -339,7 +339,7 @@ func (t *Table) minColBaseType(j int) baseType {
 	return min
 }
 
-// Read ...
+// Read table into bytes. Implements io.Reader interface.
 func (t *Table) Read(b []byte) (int, error) {
 	buf := bytes.NewBuffer(make([]byte, 0, 0))
 	if _, err := t.WriteTo(buf); err != nil {
@@ -349,7 +349,7 @@ func (t *Table) Read(b []byte) (int, error) {
 	return buf.Read(b)
 }
 
-// ReadFrom a reader. The reader should delimit rows with '\n' and
+// ReadFrom a reader into a table. The reader should delimit rows with '\n' and
 // columns with ','. The first row (the header) will be compared for
 // equality against the table's header. For example, given a table
 // with a header ["index", "value"], the following buffer contents
