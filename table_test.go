@@ -19,7 +19,7 @@ func TestReadWrite(t *testing.T) {
 	}
 	defer inFile.Close()
 
-	table, err := Import(inFile, "Test 0", FltFmtNoExp, 3)
+	table, err := ImportCSV(*csv.NewReader(inFile), "Test 0", FltFmtNoExp, 3)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -101,5 +101,5 @@ func TestTable(t *testing.T) {
 		}
 	}
 
-	// t.Fatalf("\n%s\n", tbl.String())
+	t.Fatalf("\n%s\n", tbl.String())
 }

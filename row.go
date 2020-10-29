@@ -29,8 +29,8 @@ func RowFromStr(line string) Row {
 		r  = make(Row, 0, len(ss))
 	)
 
-	for _, s := range ss {
-		r = append(r, parse(s))
+	for i := 0; i < len(ss); i++ {
+		r = append(r, parse(ss[i]))
 	}
 
 	return r
@@ -44,7 +44,7 @@ func (r Row) Bytes() []byte {
 
 	buf := bytes.NewBuffer(make([]byte, 0))
 	buf.Write(toBytes(r[0]))
-	for i := range r[1:] {
+	for i := 1; i < len(r); i++ {
 		buf.WriteByte(',')
 		buf.Write(toBytes(r[i]))
 	}
@@ -56,8 +56,7 @@ func (r Row) Bytes() []byte {
 func (r Row) Compare(row Row) int {
 	var (
 		a, b     = r.Strings(), row.Strings()
-		m, n     = len(a), len(b)
-		maxIndex = math.MinInt(m, n)
+		maxIndex = math.MinInt(len(a), len(b))
 	)
 
 	for i := 0; i < maxIndex; i++ {
@@ -69,13 +68,13 @@ func (r Row) Compare(row Row) int {
 		}
 	}
 
-	// Normally, m<n --> -1 and n<m --> 1, but here incomplete rows
+	// Normally, m < n --> -1 and n < m --> 1, but here incomplete rows
 	// should be pushed to the bottom of the table. For example,
 	// [1 2 3] < [1 2] --> -1
 	switch {
-	case m < n:
+	case len(a) < len(b):
 		return 1
-	case n < m:
+	case len(b) < len(a):
 		return -1
 	default:
 		return 0
@@ -94,17 +93,15 @@ func (r Row) Copy() Row {
 
 // isEmpty determines if a row contains data or not.
 func (r Row) isEmpty() bool {
-	for _, v := range r {
-		if v == nil {
-			continue
-		}
-
-		switch baseTypeOf(v) {
-		case integerType, floatType:
-			return false
-		case stringType:
-			if 0 < len(v.(string)) {
+	for i := 0; i < len(r); i++ {
+		if r[i] != nil {
+			switch baseTypeOf(r[i]) {
+			case integerType, floatType:
 				return false
+			case stringType:
+				if 0 < len(r[i].(string)) {
+					return false
+				}
 			}
 		}
 	}
@@ -125,8 +122,8 @@ func (r Row) StringAt(i int) string {
 // Strings returns the row updateBaseTypesAndWidthsted as []string.
 func (r Row) Strings() []string {
 	s := make([]string, 0, len(r))
-	for _, v := range r {
-		s = append(s, toString(v))
+	for i := 0; i < len(r); i++ {
+		s = append(s, toString(r[i]))
 	}
 
 	return s

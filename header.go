@@ -1,7 +1,6 @@
 package table
 
 import (
-	"bytes"
 	"strings"
 
 	math "github.com/nathangreene3/math"
@@ -14,8 +13,8 @@ type Header []string
 func NewHeader(colNames ...string) Header {
 	r := strings.NewReplacer(",", "", "\n", "")
 	h := make(Header, 0, len(colNames))
-	for _, colName := range colNames {
-		h = append(h, r.Replace(colName))
+	for i := 0; i < len(colNames); i++ {
+		h = append(h, r.Replace(colNames[i]))
 	}
 
 	return h
@@ -25,8 +24,8 @@ func NewHeader(colNames ...string) Header {
 func HeaderFromBts(colNames ...[]byte) Header {
 	r := strings.NewReplacer(",", "", "\n", "")
 	h := make(Header, 0, len(colNames))
-	for _, name := range colNames {
-		h = append(h, r.Replace(string(name)))
+	for i := 0; i < len(colNames); i++ {
+		h = append(h, r.Replace(string(colNames[i])))
 	}
 
 	return h
@@ -34,32 +33,12 @@ func HeaderFromBts(colNames ...[]byte) Header {
 
 // Bytes ...
 func (h Header) Bytes() []byte {
-	if len(h) == 0 {
-		return []byte{}
-	}
-
-	var n int
-	for i := range h {
-		n += len(h[i])
-	}
-
-	buf := bytes.NewBuffer(make([]byte, 0, n))
-	buf.WriteString(h[0])
-	for i := range h[1:] {
-		buf.WriteByte(',')
-		buf.WriteString(h[i])
-	}
-
-	return buf.Bytes()
+	return []byte(strings.Join(h, ","))
 }
 
 // Compare ...
 func (h Header) Compare(header Header) int {
-	var (
-		m, n     = len(h), len(header)
-		minIndex = math.MinInt(m, n)
-	)
-
+	minIndex := math.MinInt(len(h), len(header))
 	for i := 0; i < minIndex; i++ {
 		if c := strings.Compare(h[i], header[i]); c != 0 {
 			return c
@@ -67,9 +46,9 @@ func (h Header) Compare(header Header) int {
 	}
 
 	switch {
-	case m < n:
+	case len(h) < len(header):
 		return -1
-	case n < m:
+	case len(header) < len(h):
 		return 1
 	default:
 		return 0
@@ -88,8 +67,8 @@ func (h Header) Copy() Header {
 
 // isEmpty ...
 func (h Header) isEmpty() bool {
-	for _, v := range h {
-		if len(v) != 0 {
+	for i := 0; i < len(h); i++ {
+		if 0 < len(h[i]) {
 			return false
 		}
 	}

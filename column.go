@@ -20,8 +20,7 @@ func NewColumn(values ...interface{}) Column {
 func (c Column) Compare(col Column) int {
 	var (
 		a, b     = c.Strings(), col.Strings()
-		m, n     = len(a), len(b)
-		maxIndex = math.MinInt(m, n)
+		maxIndex = math.MinInt(len(a), len(b))
 	)
 
 	for i := 0; i < maxIndex; i++ {
@@ -37,9 +36,9 @@ func (c Column) Compare(col Column) int {
 	// should be pushed to the bottom of the table. For example,
 	// [1 2 3] < [1 2] --> -1
 	switch {
-	case m < n:
+	case len(a) < len(b):
 		return 1
-	case n < m:
+	case len(b) < len(a):
 		return -1
 	default:
 		return 0
@@ -60,17 +59,15 @@ func (c Column) Copy() Column {
 
 // isEmpty determines if a column contains data or not.
 func (c Column) isEmpty() bool {
-	for _, v := range c {
-		if v == nil {
-			continue
-		}
-
-		switch baseTypeOf(v) {
-		case integerType, floatType:
-			return false
-		case stringType:
-			if 0 < len(v.(string)) {
+	for i := 0; i < len(c); i++ {
+		if c[i] != nil {
+			switch baseTypeOf(c[i]) {
+			case integerType, floatType:
 				return false
+			case stringType:
+				if 0 < len(c[i].(string)) {
+					return false
+				}
 			}
 		}
 	}
@@ -91,8 +88,8 @@ func (c Column) StringAt(i int) string {
 // Strings ...
 func (c Column) Strings() []string {
 	s := make([]string, 0, len(c))
-	for _, v := range c {
-		s = append(s, toString(v))
+	for i := 0; i < len(c); i++ {
+		s = append(s, toString(c[i]))
 	}
 
 	return s

@@ -10,8 +10,8 @@ type Body []Row
 // NewBody ...
 func NewBody(rows ...Row) Body {
 	b := make(Body, 0, len(rows))
-	for _, r := range rows {
-		b = append(b, r.Copy())
+	for i := 0; i < len(rows); i++ {
+		b = append(b, rows[i].Copy())
 	}
 
 	return b
@@ -19,11 +19,7 @@ func NewBody(rows ...Row) Body {
 
 // Compare ...
 func (b Body) Compare(body Body) int {
-	var (
-		m, n     = len(b), len(body)
-		minIndex = math.MinInt(m, n)
-	)
-
+	minIndex := math.MinInt(len(b), len(body))
 	for i := 0; i < minIndex; i++ {
 		if c := b[i].Compare(body[i]); c != 0 {
 			return c
@@ -31,9 +27,9 @@ func (b Body) Compare(body Body) int {
 	}
 
 	switch {
-	case m < n:
+	case len(b) < len(body):
 		return -1
-	case n < m:
+	case len(body) < len(b):
 		return 1
 	default:
 		return 0
@@ -52,7 +48,7 @@ func (b Body) Swap(i, j int) {
 
 // SwapCols ...
 func (b Body) SwapCols(i, j int) {
-	for _, r := range b {
-		r.Swap(i, j)
+	for i := 0; i < len(b); i++ {
+		b[i].Swap(i, j)
 	}
 }

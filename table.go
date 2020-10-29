@@ -1,10 +1,7 @@
 package table
 
 import (
-	"bytes"
 	"encoding/csv"
-	"io"
-	"io/ioutil"
 	"sort"
 	"strconv"
 	"strings"
@@ -35,13 +32,13 @@ const (
 	// FltFmtBinExp formats floats as a binary exponent value -dddp±ddd.
 	FltFmtBinExp FltFmt = 'b'
 
-	// FltFmtDecExp formats floats as a decimal exponent value (scientific notation) -d.ddde±ddd.
+	// FltFmtDecExp formats floats as a decimal exponent value -d.ddde±ddd.
 	FltFmtDecExp FltFmt = 'e'
 
 	// FltFmtNoExp formats floats as a decimal value -ddd.ddd.
 	FltFmtNoExp FltFmt = 'f'
 
-	// FltFmtLrgExp formats floats as a large exponent value (scientific notation) -d.ddde±ddd.
+	// FltFmtLrgExp formats floats as a large exponent value -d.ddde±ddd.
 	FltFmtLrgExp FltFmt = 'g'
 )
 
@@ -64,17 +61,6 @@ func New(name string, floatFmt FltFmt, floatPrec FltPrecFmt, rows ...Row) *Table
 	return t.AppendRows(rows...)
 }
 
-// Import a reader into a table.
-func Import(r io.Reader, tableName string, fltFmt FltFmt, fltPrec FltPrecFmt) (*Table, error) {
-	// return ImportCSV(*csv.NewReader(r), tableName, fltFmt, fltPrec)
-	var (
-		t      = New(tableName, fltFmt, fltPrec)
-		_, err = t.ReadFrom(r)
-	)
-
-	return t, err
-}
-
 // ImportCSV imports a csv file into a new table.
 func ImportCSV(r csv.Reader, tableName string, fltFmt FltFmt, fltPrec FltPrecFmt) (*Table, error) {
 	lines, err := r.ReadAll()
@@ -82,24 +68,15 @@ func ImportCSV(r csv.Reader, tableName string, fltFmt FltFmt, fltPrec FltPrecFmt
 		return nil, err
 	}
 
-	var (
-		t = New(tableName, fltFmt, fltPrec)
-		n = len(lines)
-	)
-
-	if n == 0 {
-		return t, nil
+	t := New(tableName, fltFmt, fltPrec)
+	if 0 < len(lines) {
+		t.SetHeader(lines[0])
 	}
 
-	t.SetHeader(lines[0])
-	if n == 1 {
-		return t, nil // No body
-	}
-
-	for _, line := range lines[1:] {
-		r := make(Row, 0, len(line))
-		for _, s := range line {
-			r = append(r, parse(s))
+	for i := 1; i < len(lines); i++ {
+		r := make(Row, 0, len(lines[i]))
+		for j := 0; j < len(lines[i]); j++ {
+			r = append(r, parse(lines[i][j]))
 		}
 
 		t.AppendRow(r)
@@ -116,19 +93,17 @@ func (t *Table) AppendColumn(columnHeader string, c Column) *Table {
 	}
 
 	// Increase body size to column size
-	n := len(c)
-	for t.rows < n {
+	for t.rows < len(c) {
 		t.AppendRow(make(Row, t.columns))
 	}
 
 	// Increase column size to body size
-	for n < t.rows {
+	for len(c) < t.rows {
 		c = append(c, nil)
-		n++
 	}
 
 	t.header = append(t.header, strings.TrimSpace(columnHeader))
-	for i := range t.body {
+	for i := 0; i < len(t.body); i++ {
 		t.body[i] = append(t.body[i], c[i])
 	}
 
@@ -200,7 +175,7 @@ func (t *Table) AppendRow(r Row) *Table {
 
 // AppendRows ...
 func (t *Table) AppendRows(rows ...Row) *Table {
-	for i := range rows {
+	for i := 0; i < len(rows); i++ {
 		t.AppendRow(rows[i])
 	}
 
@@ -234,13 +209,13 @@ func (t *Table) Clean() *Table {
 
 // Column returns the column header and a copy of the column at a
 // given index.
-func (t *Table) Column(i int) (string, Column) {
+func (t *Table) Column(j int) (string, Column) {
 	c := make(Column, 0, len(t.body))
-	for _, r := range t.body {
-		c = append(c, r[i])
+	for i := 0; i < len(t.body); i++ {
+		c = append(c, t.body[i][j])
 	}
 
-	return t.header[i], c
+	return t.header[j], c
 }
 
 // ColumnHeader at a given index.
@@ -252,13 +227,16 @@ func (t *Table) ColumnHeader(i int) string {
 
 // Copy a table.
 func (t *Table) Copy() *Table {
-	cpy := New(t.Name, t.floatFmt, t.floatPrecision, t.body...).SetHeader(t.header)
-	return cpy
+	return New(t.Name, t.floatFmt, t.floatPrecision, t.body...).SetHeader(t.header)
 }
 
 // Dimensions returns the number of rows and columns of a table.
 func (t *Table) Dimensions() (int, int) {
-	return t.rows, t.columns
+	if 0 < len(t.body) {
+		return len(t.body), len(t.body[0])
+	}
+
+	return 0, 0
 }
 
 // updateBaseTypesAndWidths a table. This updates each column base type to its
@@ -278,8 +256,8 @@ func (t *Table) updateBaseTypesAndWidths() *Table {
 		w  int
 	)
 
-	for _, r := range t.body {
-		for j, v := range r {
+	for i := 0; i < len(t.body); i++ {
+		for j := 0; j < len(t.body[i]); j++ {
 			// Set the jth column base type to the minimum (weakest) base type
 			// found in each value at (i,j). Recall from base_type.go that
 			// strings < floats < ints. Then update the jth column width
@@ -288,18 +266,18 @@ func (t *Table) updateBaseTypesAndWidths() *Table {
 			// minColBaseType is not appropriate here because the (i,j)th value
 			// is not reset in dependence on the minimum column base type
 			// returned.
-			if bt = baseTypeOf(v); bt < t.colBaseTypes[j] {
+			if bt = baseTypeOf(t.body[i][j]); bt < t.colBaseTypes[j] {
 				t.colBaseTypes[j] = bt
 			}
 
 			// Determine the width of the (i,j)th value when converted to its base type and update the column width if the column width is too small to support it.
 			switch bt {
 			case integerType:
-				w = len(strconv.Itoa(v.(int)))
+				w = len(strconv.Itoa(t.body[i][j].(int)))
 			case floatType:
-				w = len(strconv.FormatFloat(v.(float64), byte(t.floatFmt), int(t.floatPrecision), 64))
+				w = len(strconv.FormatFloat(t.body[i][j].(float64), byte(t.floatFmt), int(t.floatPrecision), 64))
 			case stringType:
-				w = len(v.(string))
+				w = len(t.body[i][j].(string))
 			default:
 				panic("unknown base type")
 			}
@@ -325,50 +303,14 @@ func (t *Table) Header() Header {
 
 // minColBaseType returns the smallest base type found in column j.
 func (t *Table) minColBaseType(j int) baseType {
-	var (
-		min = integerType
-		bt  baseType
-	)
-
-	for _, r := range t.body {
-		if bt = baseTypeOf(r[j]); bt < min {
+	min := integerType
+	for i := 0; i < len(t.body); i++ {
+		if bt := baseTypeOf(t.body[i][j]); bt < min {
 			min = bt
 		}
 	}
 
 	return min
-}
-
-// Read table into bytes. Implements io.Reader interface.
-func (t *Table) Read(b []byte) (int, error) {
-	buf := bytes.NewBuffer(make([]byte, 0, 0))
-	if _, err := t.WriteTo(buf); err != nil {
-		return 0, err
-	}
-
-	return buf.Read(b)
-}
-
-// ReadFrom a reader into a table. The reader should delimit rows with '\n' and
-// columns with ','. The first row (the header) will be compared for
-// equality against the table's header. For example, given a table
-// with a header ["index", "value"], the following buffer contents
-// will be read into the table.
-// 	buf := bytes.NewBuffer([]byte{})
-// 	buf.WriteString("index,value\n0,a\n1,b\n2,c")
-//	n, err := table.ReadFrom(buf)
-func (t *Table) ReadFrom(r io.Reader) (int64, error) {
-	var (
-		bts, err = ioutil.ReadAll(r)
-		m        = int64(len(bts))
-	)
-
-	if err != nil {
-		return m, err
-	}
-
-	_, err = t.Write(bts)
-	return m, err
 }
 
 // RemoveColumn from a table.
@@ -377,13 +319,13 @@ func (t *Table) RemoveColumn(i int) (string, Column) {
 	c := make(Column, 0, t.rows)
 	if i+1 == t.columns {
 		t.header = t.header[:i]
-		for j := range t.body {
+		for j := 0; j < len(t.body); j++ {
 			c = append(c, t.body[j][i])
 			t.body[j] = t.body[j][:i]
 		}
 	} else {
 		t.header = append(t.header[:i], t.header[i+1:]...)
-		for j := range t.body {
+		for j := 0; j < len(t.body); j++ {
 			c = append(c, t.body[j][i])
 			t.body[j] = append(t.body[j][:i], t.body[j][:i+1]...)
 		}
@@ -456,7 +398,7 @@ func (t *Table) setColSize(n int) *Table {
 		t.header = append(t.header, "")
 	}
 
-	for i := range t.body {
+	for i := 0; i < len(t.body); i++ {
 		for len(t.body[i]) < n {
 			t.body[i] = append(t.body[i], nil)
 		}
@@ -573,8 +515,8 @@ func (t *Table) SortOnCol(colIndex int) *Table {
 func (t *Table) String() string {
 	// Create horizontal line
 	var sb strings.Builder
-	for _, w := range t.colWidths {
-		sb.WriteString("+" + strings.Repeat("-", w))
+	for i := 0; i < len(t.colWidths); i++ {
+		sb.WriteString("+" + strings.Repeat("-", t.colWidths[i]))
 	}
 
 	sb.WriteString("+\n")
@@ -625,16 +567,17 @@ func (t *Table) String() string {
 // Strings returns a list of lists-of-strings representing a table.
 func (t *Table) Strings() [][]string {
 	ss := append(make([][]string, 0, t.rows+1), t.header) // Header is the first row
-	for _, r := range t.body {
-		ss = append(ss, r.Strings())
+	for i := 0; i < len(t.body); i++ {
+		ss = append(ss, t.body[i].Strings())
 	}
 
 	return ss
 }
 
 // Swap ...
-func (t *Table) Swap(i, j int) {
+func (t *Table) Swap(i, j int) *Table {
 	t.body.Swap(i, j)
+	return t
 }
 
 // SwapCols ...
@@ -648,48 +591,4 @@ func (t *Table) SwapCols(i, j int) {
 // ExportCSV to a csv writer.
 func (t *Table) ExportCSV(w csv.Writer) error {
 	return w.WriteAll(t.Clean().Strings())
-}
-
-// Write bytes to a table.
-func (t *Table) Write(b []byte) (int, error) {
-	m := len(b)
-	if m == 0 {
-		return m, nil
-	}
-
-	lines := toLines(b)
-	if t.header.isEmpty() {
-		t.header = NewHeader(lines[0]...)
-		if len(lines) < 2 {
-			return m, nil
-		}
-		lines = lines[1:]
-	} else if t.header.Compare(NewHeader(lines[0]...)) == 0 {
-		if len(lines) < 2 {
-			return m, nil
-		}
-		lines = lines[1:]
-	}
-
-	for i := range lines {
-		r := make(Row, 0, len(lines[i]))
-		for j := range lines[i] {
-			r = append(r, parse(lines[i][j]))
-		}
-
-		t.AppendRow(r)
-	}
-
-	return m, nil
-}
-
-// WriteTo to a writer.
-func (t *Table) WriteTo(w io.Writer) (int64, error) {
-	buf := bytes.NewBuffer(make([]byte, 0))
-	if err := t.ExportCSV(*csv.NewWriter(buf)); err != nil {
-		return 0, err
-	}
-
-	n, err := w.Write(buf.Bytes())
-	return int64(n), err
 }

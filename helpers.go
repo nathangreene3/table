@@ -15,8 +15,8 @@ import (
 func toLines(b []byte) [][]string {
 	split := bytes.Split(bytes.ReplaceAll(b, []byte{'\r', '\n'}, []byte{'\n'}), []byte{'\n'})
 	lines := make([][]string, 0, len(split))
-	for _, b := range split {
-		lines = append(lines, strings.Split(string(b), ","))
+	for i := 0; i < len(split); i++ {
+		lines = append(lines, strings.Split(string(split[i]), ","))
 	}
 
 	return lines
