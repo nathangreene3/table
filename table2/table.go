@@ -5,17 +5,6 @@ import (
 	"strings"
 )
 
-const (
-	// Flt ...
-	Flt = "float64"
-
-	// Int ...
-	Int = "int"
-
-	// Str ...
-	Str = "string"
-)
-
 // Table ...
 type Table struct {
 	header  Header
@@ -85,7 +74,7 @@ func (t *Table) Col(j int) []interface{} {
 }
 
 // ColFmt ...
-func (t *Table) ColFmt(j int) string {
+func (t *Table) ColFmt(j int) Format {
 	return t.formats[j]
 }
 
@@ -160,28 +149,9 @@ func (t *Table) Equal(tbl *Table) bool {
 	return t.header.Equal(tbl.header) && t.formats.Equal(tbl.formats) && t.body.Equal(tbl.body)
 }
 
-// Fmt ...
-func (t *Table) Fmt() Formats {
-	format := make(Formats, 0, len(t.header))
-	for j := 0; j < len(t.header); j++ {
-		format = append(format, t.formats[j])
-	}
-
-	return format
-}
-
-// Fmt ...
-func Fmt(x interface{}) string {
-	switch x.(type) {
-	case float64:
-		return Flt
-	case int:
-		return Int
-	case string:
-		return Str
-	default:
-		return ""
-	}
+// Fmts ...
+func (t *Table) Fmts() Formats {
+	return t.formats.Copy()
 }
 
 // Get ...
@@ -202,6 +172,11 @@ func (t *Table) GetInt(i, j int) int {
 // GetStr ...
 func (t *Table) GetStr(i, j int) string {
 	return t.body[i*len(t.header)+j].(string)
+}
+
+// Header ...
+func (t *Table) Header() Header {
+	return t.header.Copy()
 }
 
 // Remove ...
@@ -246,10 +221,10 @@ func (t *Table) String() string {
 		hs = append(hs, strings.Repeat("-", ws[j]+2))
 	}
 
-	h := "+" + strings.Join(hs, "+") + "+\n"
+	h := "+" + strings.Join(hs, "+") + "+"
 
 	var sb strings.Builder
-	sb.WriteString(h + "|")
+	sb.WriteString(h + "\n|")
 	for j := 0; j < n; j++ {
 		switch t.formats[j] {
 		case Flt, Int:
@@ -262,21 +237,20 @@ func (t *Table) String() string {
 
 	sb.WriteString("\n" + h)
 	for i := 0; i < len(b); i += n {
-		sb.WriteByte('|')
+		sb.WriteString("\n|")
 		for j, k := 0, i; j < n && k < len(b); j, k = j+1, k+1 {
 			switch t.formats[j] {
 			case Flt, Int:
+				// Right-aligned
 				sb.WriteString(strings.Repeat(" ", ws[j]-len(b[k])+1) + b[k] + " |")
 			case Str:
+				// Left-aligned
 				sb.WriteString(" " + b[k] + strings.Repeat(" ", ws[j]-len(b[k])+1) + "|")
-			default:
 			}
 		}
-
-		sb.WriteByte('\n')
 	}
 
-	sb.WriteString(h)
+	sb.WriteString("\n" + h)
 	return sb.String()
 }
 

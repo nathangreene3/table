@@ -1,26 +1,21 @@
 package table2
 
-import "strconv"
+import (
+	"fmt"
+	"strconv"
+)
 
 // Body ...
 type Body []interface{}
 
-// Strings ...
-func (b Body) Strings() []string {
-	ss := make([]string, 0, len(b))
-	for i := 0; i < len(b); i++ {
-		switch v := b[i].(type) {
-		case float64:
-			ss = append(ss, strconv.FormatFloat(v, 'f', -1, 64))
-		case int:
-			ss = append(ss, strconv.Itoa(v))
-		case string:
-			ss = append(ss, v)
-		default:
-		}
-	}
+// NewBody ...
+func NewBody(values ...interface{}) Body {
+	return append(make(Body, 0, len(values)), values...)
+}
 
-	return ss
+// Copy ...
+func (b Body) Copy() Body {
+	return append(make(Body, 0, len(b)), b...)
 }
 
 // Equal ...
@@ -34,4 +29,24 @@ func (b Body) Equal(bdy Body) bool {
 	}
 
 	return i == len(b)
+}
+
+// Strings ...
+func (b Body) Strings() []string {
+	ss := make([]string, 0, len(b))
+	for i := 0; i < len(b); i++ {
+		switch Fmt(b[i]) {
+		case Flt:
+			ss = append(ss, strconv.FormatFloat(b[i].(float64), 'f', -1, 64))
+		case Int:
+			ss = append(ss, strconv.Itoa(b[i].(int)))
+		case Str:
+			ss = append(ss, b[i].(string))
+		default:
+			// TODO: Should this panic?
+			ss = append(ss, fmt.Sprintf("%v", b[i]))
+		}
+	}
+
+	return ss
 }

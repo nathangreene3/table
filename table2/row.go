@@ -5,9 +5,12 @@ type Row []interface{}
 
 // NewRow ...
 func NewRow(values ...interface{}) Row {
-	r := make(Row, len(values))
-	copy(r, values)
-	return r
+	return append(make(Row, 0, len(values)), values...)
+}
+
+// Copy ...
+func (r Row) Copy() Row {
+	return append(make(Row, 0, len(r)), r...)
 }
 
 // Equal ...
@@ -16,9 +19,21 @@ func (r Row) Equal(row Row) bool {
 		return false
 	}
 
-	var i int
-	for ; i < len(r) && r[i] == row[i]; i++ {
+	for i := 0; i < len(r); i++ {
+		if r[i] != row[i] {
+			return false
+		}
 	}
 
-	return i == len(r)
+	return true
+}
+
+// Fmts ...
+func (r Row) Fmts() Formats {
+	f := make(Formats, 0, len(r))
+	for i := 0; i < len(r); i++ {
+		f = append(f, Fmt(r[i]))
+	}
+
+	return f
 }

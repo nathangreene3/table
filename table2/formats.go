@@ -1,7 +1,31 @@
 package table2
 
+const (
+	// Flt ...
+	Flt Format = "float64"
+
+	// Int ...
+	Int Format = "int"
+
+	// Str ...
+	Str Format = "string"
+)
+
+// Format ...
+type Format string
+
 // Formats ...
-type Formats []string
+type Formats []Format
+
+// NewFormats ...
+func NewFormats(fmts ...Format) Formats {
+	return append(make(Formats, 0, len(fmts)), fmts...)
+}
+
+// Copy ...
+func (f Formats) Copy() Formats {
+	return append(make(Formats, 0, len(f)), f...)
+}
 
 // Equal ...
 func (f Formats) Equal(fmts Formats) bool {
@@ -9,9 +33,25 @@ func (f Formats) Equal(fmts Formats) bool {
 		return false
 	}
 
-	var i int
-	for ; i < len(f) && f[i] == fmts[i]; i++ {
+	for i := 0; i < len(f); i++ {
+		if f[i] != fmts[i] {
+			return false
+		}
 	}
 
-	return i == len(f)
+	return true
+}
+
+// Fmt ...
+func Fmt(x interface{}) Format {
+	switch x.(type) {
+	case float64:
+		return Flt
+	case int:
+		return Int
+	case string:
+		return Str
+	default:
+		return ""
+	}
 }

@@ -19,7 +19,7 @@ func TestTable(t *testing.T) {
 		)
 
 		fmt.Println(tbl.String())
-		fmt.Println(tbl.Fmt())
+		fmt.Println(tbl.Fmts())
 	}
 
 	t.Fatal()
