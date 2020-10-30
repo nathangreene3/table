@@ -7,16 +7,16 @@ import (
 
 func TestTable(t *testing.T) {
 	{
-		var (
-			h   = Header{"Integers", "Floats", "Strings"}
-			tbl = New(h).Append(Row{0, 0.0, "zero"})
+		tbl := New(NewHeader("Integers", "Floats", "Strings")).Append(
+			NewRow(0, 0.0, "zero"),
+		).Append(
+			NewRow(1, 1.1, "one"),
+			NewRow(4, 4.4, "four"),
+			NewRow(3, 3.3, "three"),
 		)
 
-		tbl.Append(
-			Row{1, 1.1, "one"},
-			Row{2, 2.2, "two"},
-			Row{3, 3.3, "three"},
-		)
+		r4 := tbl.Remove(2)
+		tbl.Insert(2, NewRow(2, 0.0, "two")).Append(r4).Set(2, 1, 2.2)
 
 		fmt.Println(tbl.String())
 		fmt.Println(tbl.Fmts())

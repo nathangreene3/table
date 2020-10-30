@@ -1,7 +1,6 @@
 package table2
 
 import (
-	"fmt"
 	"strconv"
 )
 
@@ -43,8 +42,7 @@ func (b Body) Strings() []string {
 		case Str:
 			ss = append(ss, b[i].(string))
 		default:
-			// TODO: Should this panic?
-			ss = append(ss, fmt.Sprintf("%v", b[i]))
+			panic("invalid format")
 		}
 	}
 

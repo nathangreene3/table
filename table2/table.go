@@ -179,6 +179,12 @@ func (t *Table) Header() Header {
 	return t.header.Copy()
 }
 
+// Insert ...
+func (t *Table) Insert(i int, r Row) *Table {
+	m, _ := t.Dims()
+	return t.Append(r).Swap(i, m)
+}
+
 // Remove ...
 func (t *Table) Remove(i int) Row {
 	var (
@@ -187,6 +193,10 @@ func (t *Table) Remove(i int) Row {
 	)
 
 	t.body = append(t.body[:i*n], t.body[(i+1)*n:]...)
+	if len(t.body) == 0 {
+		t.formats = make(Formats, 0, len(t.header))
+	}
+
 	return r
 }
 
@@ -194,6 +204,34 @@ func (t *Table) Remove(i int) Row {
 func (t *Table) Row(i int) Row {
 	_, n := t.Dims()
 	return NewRow(t.body[i*n : (i+1)*n]...)
+}
+
+// Rows ...
+func (t *Table) Rows() []Row {
+	m, n := t.Dims()
+	rs := make([]Row, 0, m)
+	for i := 0; i < m; i++ {
+		rs = append(rs, NewRow(t.body[i*n:(i+1)*n]))
+	}
+
+	return rs
+}
+
+// Set ...
+func (t *Table) Set(i, j int, v interface{}) *Table {
+	if Fmt(v) != t.formats[j] {
+		panic("invalid format")
+	}
+
+	_, n := t.Dims()
+	t.body[i*n+j] = v
+	return t
+}
+
+// Sort ...
+func (t *Table) Sort(j int) *Table {
+	// TODO
+	return t
 }
 
 // String ...
@@ -274,4 +312,15 @@ func (t *Table) Strings() []string {
 	}
 
 	return ss
+}
+
+// Swap ...
+func (t *Table) Swap(i, j int) *Table {
+	_, n := t.Dims()
+	for k := 0; k < n; k++ {
+		ik, jk := i*n+k, j*n+k
+		t.body[ik], t.body[jk] = t.body[jk], t.body[ik]
+	}
+
+	return t
 }
