@@ -58,6 +58,30 @@ func (t *Table) Append(r ...Row) *Table {
 	return t
 }
 
+// AppendCol ...TODO
+// func (t *Table) AppendCol(colName string, c Column) *Table {
+// 	m, n := t.Dims()
+// 	if m != len(c) {
+// 		panic("dimension mismatch")
+// 	}
+
+// 	t.header = append(t.header, colName)
+// 	if 0 < m {
+// 		t.formats = append(t.formats, Fmt(c[0]))
+// 		if len(c)+len(t.body) <= cap(t.body) {
+// 			t.body = append(t.body, make([]interface{}, m)...)
+// 			for i := m - 1; 0 <= i; i-- {
+// 				t.body[i*n+]
+// 				copy(t.body[i*] ,t.body[i*n : i*(n+1)])
+// 			}
+// 		} else {
+
+// 		}
+// 	}
+
+// 	return t
+// }
+
 // Col ...
 func (t *Table) Col(j int) []interface{} {
 	m, n := t.Dims()
@@ -185,6 +209,11 @@ func (t *Table) Insert(i int, r Row) *Table {
 	return t.Append(r).Swap(i, m)
 }
 
+// InsertCol ...
+func (t *Table) InsertCol(i int, c Column) *Table {
+	return t
+}
+
 // Remove ...
 func (t *Table) Remove(i int) Row {
 	var (
@@ -193,8 +222,8 @@ func (t *Table) Remove(i int) Row {
 	)
 
 	t.body = append(t.body[:i*n], t.body[(i+1)*n:]...)
-	if len(t.body) == 0 {
-		t.formats = make(Formats, 0, len(t.header))
+	if len(t.body) < n {
+		t.formats = t.formats[:0]
 	}
 
 	return r
@@ -208,8 +237,11 @@ func (t *Table) Row(i int) Row {
 
 // Rows ...
 func (t *Table) Rows() []Row {
-	m, n := t.Dims()
-	rs := make([]Row, 0, m)
+	var (
+		m, n = t.Dims()
+		rs   = make([]Row, 0, m)
+	)
+
 	for i := 0; i < m; i++ {
 		rs = append(rs, NewRow(t.body[i*n:(i+1)*n]))
 	}
@@ -267,7 +299,7 @@ func (t *Table) String() string {
 		switch t.formats[j] {
 		case Flt, Int:
 			sb.WriteString(strings.Repeat(" ", ws[j]-len(t.header[j])+1) + t.header[j] + " |")
-		case Str:
+		case Bool, Str:
 			sb.WriteString(" " + t.header[j] + strings.Repeat(" ", ws[j]-len(t.header[j])+1) + "|")
 		default:
 		}
@@ -281,7 +313,7 @@ func (t *Table) String() string {
 			case Flt, Int:
 				// Right-aligned
 				sb.WriteString(strings.Repeat(" ", ws[j]-len(b[k])+1) + b[k] + " |")
-			case Str:
+			case Bool, Str:
 				// Left-aligned
 				sb.WriteString(" " + b[k] + strings.Repeat(" ", ws[j]-len(b[k])+1) + "|")
 			}

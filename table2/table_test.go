@@ -6,6 +6,7 @@ import (
 )
 
 func TestTable(t *testing.T) {
+
 	{
 		tbl := New(NewHeader("Integers", "Floats", "Strings")).Append(
 			NewRow(0, 0.0, "zero"),

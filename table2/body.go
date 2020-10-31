@@ -35,6 +35,8 @@ func (b Body) Strings() []string {
 	ss := make([]string, 0, len(b))
 	for i := 0; i < len(b); i++ {
 		switch Fmt(b[i]) {
+		case Bool:
+			ss = append(ss, strconv.FormatBool(b[i].(bool)))
 		case Flt:
 			ss = append(ss, strconv.FormatFloat(b[i].(float64), 'f', -1, 64))
 		case Int:

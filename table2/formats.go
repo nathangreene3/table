@@ -1,6 +1,9 @@
 package table2
 
 const (
+	// Bool ...
+	Bool Format = "bool"
+
 	// Flt ...
 	Flt Format = "float64"
 
@@ -45,6 +48,8 @@ func (f Formats) Equal(fmts Formats) bool {
 // Fmt ...
 func Fmt(x interface{}) Format {
 	switch x.(type) {
+	case bool:
+		return Bool
 	case float64:
 		return Flt
 	case int:
