@@ -58,29 +58,56 @@ func (t *Table) Append(r ...Row) *Table {
 	return t
 }
 
-// AppendCol ...TODO
-// func (t *Table) AppendCol(colName string, c Column) *Table {
-// 	m, n := t.Dims()
-// 	if m != len(c) {
-// 		panic("dimension mismatch")
-// 	}
+// AppendCol ...
+func (t *Table) AppendCol(colName string, c Column) *Table {
+	m, n := t.Dims()
+	if m != len(c) {
+		panic("dimension mismatch")
+	}
 
-// 	t.header = append(t.header, colName)
-// 	if 0 < m {
-// 		t.formats = append(t.formats, Fmt(c[0]))
-// 		if len(c)+len(t.body) <= cap(t.body) {
-// 			t.body = append(t.body, make([]interface{}, m)...)
-// 			for i := m - 1; 0 <= i; i-- {
-// 				t.body[i*n+]
-// 				copy(t.body[i*] ,t.body[i*n : i*(n+1)])
-// 			}
-// 		} else {
+	// 1 2 3 --> 1 2 3 1
+	// 4 5 6     4 5 6 2
+	//
+	// 1 2 3 4 5 6 --> 1 2 3 1 4 5 6 2
+	//
+	// 1 2 3 4 5 6 0 0
+	// 1 2 3 4 4 5 6 2 // Insert 2; shift 4 5 6 over 1
+	// 1 2 3 1 4 5 6 2 // Insert 1
 
-// 		}
-// 	}
+	// 1 2 3 --> 1 2 3 1
+	// 4 5 6     4 5 6 2
+	// 7 8 9     7 8 9 3
+	//
+	// 1 2 3 4 5 6 7 8 9 --> 1 2 3 1 4 5 6 2 7 8 9 3
+	//
+	// 1 2 3 4 5 6 7 8 9 0 0 0
+	// 1 2 3 4 5 6 7 8 7 8 9 3 // Insert 3; shift 7 8 9 over 2
+	// 1 2 3 4 4 5 6 2 7 8 9 3 // Insert 2; shift 4 5 6 over 1
+	// 1 2 3 1 4 5 6 2 7 8 9 3 // Insert 1
 
-// 	return t
-// }
+	t.header = append(t.header, colName)
+	if 0 < m {
+		t.formats = append(t.formats, Fmt(c[0]))
+		if m+len(t.body) <= cap(t.body) {
+			t.body = append(t.body, make([]interface{}, m)...)
+			for i := m - 1; 0 < i; i-- {
+				t.body[i*n+i+n] = c[i]
+				copy(t.body[i*n+i:i*n+i+n], t.body[i*n:i*n+n])
+			}
+
+			t.body[n] = c[0]
+		} else {
+			b := make(Body, 0, (m+1)*n)
+			for i := 0; i < m; i++ {
+				b = append(append(b, t.body[i*n:(i+1)*n]...), c[i])
+			}
+
+			t.body = b
+		}
+	}
+
+	return t
+}
 
 // Col ...
 func (t *Table) Col(j int) []interface{} {
@@ -210,8 +237,9 @@ func (t *Table) Insert(i int, r Row) *Table {
 }
 
 // InsertCol ...
-func (t *Table) InsertCol(i int, c Column) *Table {
-	return t
+func (t *Table) InsertCol(i int, colName string, c Column) *Table {
+	_, n := t.Dims()
+	return t.AppendCol(colName, c).SwapCols(i, n)
 }
 
 // Remove ...
@@ -352,6 +380,19 @@ func (t *Table) Swap(i, j int) *Table {
 	for k := 0; k < n; k++ {
 		ik, jk := i*n+k, j*n+k
 		t.body[ik], t.body[jk] = t.body[jk], t.body[ik]
+	}
+
+	return t
+}
+
+// SwapCols ...
+func (t *Table) SwapCols(i, j int) *Table {
+	t.header[i], t.header[j] = t.header[j], t.header[i]
+	t.formats[i], t.formats[j] = t.formats[j], t.formats[i]
+
+	_, n := t.Dims()
+	for kn := 0; kn < len(t.body); kn += n {
+		t.body[kn+i], t.body[kn+j] = t.body[kn+j], t.body[kn+i]
 	}
 
 	return t
