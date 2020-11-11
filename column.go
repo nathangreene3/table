@@ -3,7 +3,7 @@ package table
 import (
 	"strings"
 
-	"github.com/nathangreene3/math"
+	math "github.com/nathangreene3/math"
 )
 
 // A Column is a collection of the ith values in a body of rows.

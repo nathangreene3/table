@@ -1,6 +1,7 @@
 package table2
 
 import (
+	"encoding/csv"
 	"strconv"
 	"strings"
 )
@@ -64,26 +65,6 @@ func (t *Table) AppendCol(colName string, c Column) *Table {
 	if m != len(c) {
 		panic("dimension mismatch")
 	}
-
-	// 1 2 3 --> 1 2 3 1
-	// 4 5 6     4 5 6 2
-	//
-	// 1 2 3 4 5 6 --> 1 2 3 1 4 5 6 2
-	//
-	// 1 2 3 4 5 6 0 0
-	// 1 2 3 4 4 5 6 2 // Insert 2; shift 4 5 6 over 1
-	// 1 2 3 1 4 5 6 2 // Insert 1
-
-	// 1 2 3 --> 1 2 3 1
-	// 4 5 6     4 5 6 2
-	// 7 8 9     7 8 9 3
-	//
-	// 1 2 3 4 5 6 7 8 9 --> 1 2 3 1 4 5 6 2 7 8 9 3
-	//
-	// 1 2 3 4 5 6 7 8 9 0 0 0
-	// 1 2 3 4 5 6 7 8 7 8 9 3 // Insert 3; shift 7 8 9 over 2
-	// 1 2 3 4 4 5 6 2 7 8 9 3 // Insert 2; shift 4 5 6 over 1
-	// 1 2 3 1 4 5 6 2 7 8 9 3 // Insert 1
 
 	t.header = append(t.header, colName)
 	if 0 < m {
@@ -200,6 +181,11 @@ func (t *Table) Equal(tbl *Table) bool {
 	return t.header.Equal(tbl.header) && t.formats.Equal(tbl.formats) && t.body.Equal(tbl.body)
 }
 
+// Export ...
+func (t *Table) Export(w *csv.Writer) error {
+	return w.WriteAll(t.Strings())
+}
+
 // Fmts ...
 func (t *Table) Fmts() Formats {
 	return t.formats.Copy()
@@ -230,6 +216,45 @@ func (t *Table) Header() Header {
 	return t.header.Copy()
 }
 
+// Import ...
+func Import(r *csv.Reader) (*Table, error) {
+	lines, err := r.ReadAll()
+	if err != nil {
+		return nil, err
+	}
+
+	if len(lines) == 0 {
+		return New(NewHeader()), nil
+	}
+
+	t := New(NewHeader(lines[0]...))
+	for i := 1; i < len(lines); i++ {
+		r := make(Row, 0, len(lines[i]))
+		for j := 0; j < len(lines[i]); j++ {
+			if n, err := strconv.ParseInt(lines[i][j], 10, strconv.IntSize); err == nil {
+				r = append(r, int(n))
+				continue
+			}
+
+			if f, err := strconv.ParseFloat(lines[i][j], strconv.IntSize); err == nil {
+				r = append(r, f)
+				continue
+			}
+
+			if b, err := strconv.ParseBool(lines[i][j]); err == nil {
+				r = append(r, b)
+				continue
+			}
+
+			r = append(r, lines[i][j])
+		}
+
+		t.Append(r)
+	}
+
+	return t, nil
+}
+
 // Insert ...
 func (t *Table) Insert(i int, r Row) *Table {
 	m, _ := t.Dims()
@@ -255,6 +280,31 @@ func (t *Table) Remove(i int) Row {
 	}
 
 	return r
+}
+
+// RemoveCol ...
+func (t *Table) RemoveCol(j int) (string, Column) {
+	var (
+		m, n   = t.Dims()
+		name   = t.header[j]
+		column = make([]interface{}, 0, m)
+	)
+
+	t.header = append(t.header[:j], t.header[j+1:]...)
+	t.formats = append(t.formats[:j], t.formats[j+1:]...)
+	if 0 < m {
+		for i := 0; i+1 < m; i++ {
+			ij := i*n + j
+			column = append(column, t.body[ij])
+			copy(t.body[ij-i:ij-i+n-1], t.body[ij+1:ij+n])
+		}
+
+		ij := len(t.body) - n + j
+		column = append(column, t.body[ij])
+		t.body = append(t.body[:ij-m+1], t.body[ij+1:]...)
+	}
+
+	return name, column
 }
 
 // Row ...
@@ -353,22 +403,35 @@ func (t *Table) String() string {
 }
 
 // Strings ...
-func (t *Table) Strings() []string {
-	ss := make([]string, 0, len(t.header)+len(t.body))
+func (t *Table) Strings() [][]string {
+	var (
+		m, n = t.Dims()
+		ss   = make([][]string, 0, m+1)
+		h    = make([]string, 0, n)
+	)
+
 	for j := 0; j < len(t.header); j++ {
-		ss = append(ss, t.header[j])
+		h = append(h, t.header[j])
 	}
 
-	for i := 0; i < len(t.body); i++ {
-		switch v := t.body[i].(type) {
-		case float64:
-			ss = append(ss, strconv.FormatFloat(v, 'f', -1, 64))
-		case int:
-			ss = append(ss, strconv.Itoa(v))
-		case string:
-			ss = append(ss, v)
-		default:
+	ss = append(ss, h)
+	for i := 0; i < m; i++ {
+		r := make([]string, 0, n)
+		for j := 0; j < n; j++ {
+			switch v := t.body[i*n+j].(type) {
+			case bool:
+				r = append(r, strconv.FormatBool(v))
+			case float64:
+				r = append(r, strconv.FormatFloat(v, 'f', -1, 64))
+			case int:
+				r = append(r, strconv.Itoa(v))
+			case string:
+				r = append(r, v)
+			default:
+			}
 		}
+
+		ss = append(ss, r)
 	}
 
 	return ss

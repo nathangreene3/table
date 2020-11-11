@@ -5,6 +5,14 @@ type Column []interface{}
 
 // NewCol ...
 func NewCol(values ...interface{}) Column {
+	if 0 < len(values) {
+		for i, f := 1, Fmt(values[0]); i < len(values); i++ {
+			if f != Fmt(values[i]) {
+				panic("invalid format")
+			}
+		}
+	}
+
 	return append(make(Column, 0, len(values)), values...)
 }
 
@@ -15,11 +23,12 @@ func (c Column) Copy() Column {
 
 // Equal ...
 func (c Column) Equal(col Column) bool {
-	if len(c) != len(col) {
+	n := len(c)
+	if n != len(col) {
 		return false
 	}
 
-	for i := 0; i < len(c); i++ {
+	for i := 0; i < n; i++ {
 		if c[i] != col[i] {
 			return false
 		}
@@ -28,11 +37,11 @@ func (c Column) Equal(col Column) bool {
 	return true
 }
 
-// Fmts ...
-func (c Column) Fmts() Formats {
-	f := make(Formats, 0, len(c))
-	for i := 0; i < len(c); i++ {
-		f = append(f, Fmt(c[i]))
+// Fmt ...
+func (c Column) Fmt() Format {
+	var f Format
+	if 0 < len(c) {
+		f = Fmt(c[0])
 	}
 
 	return f

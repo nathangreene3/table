@@ -23,11 +23,13 @@ func (b Body) Equal(bdy Body) bool {
 		return false
 	}
 
-	var i int
-	for ; i < len(b) && b[i] == bdy[i]; i++ {
+	for i := 0; i < len(b); i++ {
+		if b[i] != bdy[i] {
+			return false
+		}
 	}
 
-	return i == len(b)
+	return true
 }
 
 // Strings ...
