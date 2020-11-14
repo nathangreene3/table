@@ -267,6 +267,98 @@ func (t *Table) InsertCol(i int, colName string, c Column) *Table {
 	return t.AppendCol(colName, c).SwapCols(i, n)
 }
 
+// JSON ...
+func (t *Table) JSON() string {
+	var (
+		sb   strings.Builder
+		m, n = t.Dims()
+	)
+
+	sb.Grow((m + 3) * n * 8)
+	sb.WriteString("{\"header\":[")
+	if 0 < n {
+		sb.WriteString("\"" + strings.Join([]string(t.header), "\",\"") + "\"")
+	}
+
+	sb.WriteString("],\"formats\":[")
+	if 0 < n {
+		sb.WriteString("\"" + string(t.formats[0]) + "\"")
+		for j := 1; j < n; j++ {
+			sb.WriteString(",\"" + string(t.formats[j]) + "\"")
+		}
+	}
+
+	sb.WriteString("],\"body\":[")
+	if 0 < m && 0 < n {
+		sb.WriteByte('[')
+		switch t.formats[0] {
+		case Int:
+			sb.WriteString(strconv.FormatInt(int64(t.body[0].(int)), 10))
+		case Flt:
+			sb.WriteString(strconv.FormatFloat(float64(t.body[0].(float64)), 'f', -1, 64))
+		case Bool:
+			sb.WriteString("\"" + strconv.FormatBool(t.body[0].(bool)) + "\"")
+		case Str:
+			sb.WriteString("\"" + t.body[0].(string) + "\"")
+		default:
+		}
+
+		for j := 1; j < n; j++ {
+			switch t.formats[j] {
+			case Int:
+				sb.WriteString("," + strconv.FormatInt(int64(t.body[j].(int)), 10))
+			case Flt:
+				sb.WriteString("," + strconv.FormatFloat(t.body[j].(float64), 'f', -1, 64))
+			case Bool:
+				sb.WriteString(",\"" + strconv.FormatBool(t.body[j].(bool)) + "\"")
+			case Str:
+				sb.WriteString(",\"" + t.body[j].(string) + "\"")
+			default:
+			}
+		}
+
+		sb.WriteByte(']')
+		for i := 1; i < m; i++ {
+			sb.WriteString(",[")
+			switch t.formats[0] {
+			case Int:
+				sb.WriteString(strconv.FormatInt(int64(t.body[i*n].(int)), 10))
+			case Flt:
+				sb.WriteString(strconv.FormatFloat(t.body[i*n].(float64), 'f', -1, 64))
+			case Bool:
+				sb.WriteString("\"" + strconv.FormatBool(t.body[i*n].(bool)) + "\"")
+			case Str:
+				sb.WriteString("\"" + t.body[i*n].(string) + "\"")
+			default:
+			}
+
+			for j := 1; j < n; j++ {
+				switch t.formats[j] {
+				case Int:
+					sb.WriteString("," + strconv.FormatInt(int64(t.body[i*n+j].(int)), 10))
+				case Flt:
+					sb.WriteString("," + strconv.FormatFloat(t.body[i*n+j].(float64), 'f', -1, 64))
+				case Bool:
+					sb.WriteString(",\"" + strconv.FormatBool(t.body[i*n+j].(bool)) + "\"")
+				case Str:
+					sb.WriteString(",\"" + t.body[i*n+j].(string) + "\"")
+				default:
+				}
+			}
+
+			sb.WriteString("]")
+		}
+	}
+
+	sb.WriteString("]}")
+	return sb.String()
+}
+
+// MarshalJSON ...
+func (t *Table) MarshalJSON() ([]byte, error) {
+	return []byte(t.JSON()), nil
+}
+
 // Remove ...
 func (t *Table) Remove(i int) Row {
 	var (

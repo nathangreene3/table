@@ -1,6 +1,7 @@
 package table2
 
 import (
+	"encoding/json"
 	"strconv"
 )
 
@@ -32,6 +33,19 @@ func (b Body) Equal(bdy Body) bool {
 	return true
 }
 
+// String ...
+// func (b Body) String() string {
+// 	var sb strings.Builder
+// 	if 0 < len(b) {
+// 		sb.Grow(len(b) * len(b[0]) * 8)
+// 		for i := 0; i < len(b); i++ {
+
+// 		}
+// 	}
+
+// 	return "[" + sb.String() + "]"
+// }
+
 // Strings ...
 func (b Body) Strings() []string {
 	ss := make([]string, 0, len(b))
@@ -51,4 +65,9 @@ func (b Body) Strings() []string {
 	}
 
 	return ss
+}
+
+// MarshalJSON ...
+func (b Body) MarshalJSON() ([]byte, error) {
+	return json.Marshal(b.Strings())
 }

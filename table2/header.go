@@ -1,5 +1,11 @@
 package table2
 
+import (
+	"bytes"
+	"encoding/json"
+	"strings"
+)
+
 // Header ...
 type Header []string
 
@@ -26,4 +32,29 @@ func (h Header) Equal(hdr Header) bool {
 	}
 
 	return true
+}
+
+// MarshalJSON ...
+func (h Header) MarshalJSON() ([]byte, error) {
+	return []byte(h.JSON()), nil
+}
+
+// UnmarshalJSON ...
+func (h Header) UnmarshalJSON(b []byte) error {
+	if len(b) < 2 {
+		json.Marshal(nil)
+		return &json.MarshalerError{}
+	}
+
+	bs := bytes.SplitN(b[1:len(b)-1], []byte(","), cap(h)-len(h))
+	for i := len(h); i < len(bs); i++ {
+		h = append(h, string(bs[i]))
+	}
+
+	return nil
+}
+
+// JSON ...
+func (h Header) JSON() string {
+	return "[" + strings.Join([]string(h), ",") + "]"
 }

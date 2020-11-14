@@ -33,8 +33,8 @@ func TestImportExport(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-
 	defer inFile.Close()
+
 	tbl, err := Import(csv.NewReader(inFile))
 	if err != nil {
 		t.Fatal(err)
@@ -53,4 +53,15 @@ func TestImportExport(t *testing.T) {
 	if err := tbl.Export(csv.NewWriter(outFile)); err != nil {
 		t.Fatal(err)
 	}
+
+	b, err := tbl.MarshalJSON()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	t.Errorf("\n%s\n", string(b))
+}
+
+func BenchmarkJSON(b *testing.B) {
+
 }
