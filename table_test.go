@@ -1,105 +1,116 @@
 package table
 
 import (
-	"bytes"
 	"encoding/csv"
 	"fmt"
 	"os"
-	"sort"
-	"strings"
 	"testing"
-
-	"github.com/nathangreene3/math"
+	"time"
 )
 
-func TestReadWrite(t *testing.T) {
+func TestTable(t *testing.T) {
+	{
+		tbl := New(NewHeader("Integers", "Floats")).Append(
+			NewRow(0, 0.0),
+		).Append(
+			NewRow(-1, -1.1),
+			NewRow(4, -4.4),
+			NewRow(-3, 3.3),
+		)
+
+		r4 := tbl.Remove(2)
+		fmt.Println(tbl.Insert(2, NewRow(2, 0.0)).Append(r4).Set(2, 1, 2.2).String())
+		fmt.Println(tbl.Types())
+		fmt.Println(tbl.InsertCol(0, "Strings", NewCol("zero", "one", "two", "three", "four")).String())
+		fmt.Println(tbl.RemoveCol(0))
+		fmt.Println(tbl.String())
+		fmt.Println(tbl.AppendCol("Times", NewCol(time.Time{}, time.Time{}, time.Time{}, time.Time{}, time.Time{})).String())
+	}
+
+	type test struct {
+		colNames []string
+		ints     []int
+		flts     []float64
+		bools    []bool
+		times    []time.Time
+		strs     []string
+		exp      *Table
+	}
+
+	tests := []test{
+		test{
+			colNames: []string{"Integers", "Floats", "Booleans", "Times", "Strings"},
+			ints:     []int{0, 1, 2, 3, 4},
+			flts:     []float64{0, 1, 2, 3, 4},
+			bools:    []bool{false, true, false, true, false},
+			times:    []time.Time{time.Time{}.AddDate(0, 0, 0), time.Time{}.AddDate(0, 0, 1), time.Time{}.AddDate(0, 0, 2), time.Time{}.AddDate(0, 0, 3), time.Time{}.AddDate(0, 0, 4)},
+			strs:     []string{"zero", "one", "two", "three", "four"},
+			exp: &Table{
+				header: Header{"Integers", "Floats", "Booleans", "Times", "Strings"},
+				types:  Types{1, 2, 3, 4, 5},
+				body: Body{
+					int(0), float64(0.0), false, time.Time{}.AddDate(0, 0, 0), "zero",
+					int(1), float64(1.0), true, time.Time{}.AddDate(0, 0, 1), "one",
+					int(2), float64(2.0), false, time.Time{}.AddDate(0, 0, 2), "two",
+					int(3), float64(3.0), true, time.Time{}.AddDate(0, 0, 3), "three",
+					int(4), float64(4.0), false, time.Time{}.AddDate(0, 0, 4), "four",
+				},
+			},
+		},
+	}
+
+	for _, tst := range tests {
+		rec := New(NewHeader(tst.colNames...))
+		for i := 0; i < len(tst.ints); i++ {
+			rec.Append(NewRow(tst.ints[i], tst.flts[i], tst.bools[i], tst.times[i], tst.strs[i]))
+		}
+
+		if !tst.exp.Equal(rec) {
+			t.Errorf("\nexpected %v\nreceived %v\n", tst.exp, rec)
+		}
+	}
+}
+
+func TestImportExport(t *testing.T) {
 	inFile, err := os.Open("test0.csv")
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer inFile.Close()
 
-	table, err := ImportCSV(*csv.NewReader(inFile), "Test 0", FltFmtNoExp, 3)
+	tbl, err := FromCSV(csv.NewReader(inFile))
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	var (
-		s   = "integers,strings,floats\n4,e,4"
-		buf = bytes.NewBuffer(make([]byte, 0, len(s)))
-	)
+	tbl.Insert(1, NewRow(1, 1.1, "one", false))
+	tbl.Insert(2, NewRow(2, 2.2, "two", false))
+	tbl.Append(NewRow(4, 4.4, "four", false))
 
-	buf.WriteString(s)
-	table.AppendRow(RowFromBts(buf.Bytes()))
-	outFile, err := os.OpenFile("test1.csv", os.O_RDWR, os.ModePerm)
+	outFile, err := os.OpenFile("test1.csv", os.O_RDWR|os.O_CREATE, os.ModePerm)
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer outFile.Close()
 
-	if err := table.ExportCSV(*csv.NewWriter(outFile)); err != nil {
+	if err := tbl.ToCSV(csv.NewWriter(outFile)); err != nil {
 		t.Fatal(err)
 	}
 
-	t.Fatalf("\n%s", table.String())
+	b, err := tbl.MarshalJSON()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	t.Errorf("\n%s\n", string(b))
+	newTbl := New(nil)
+	if err := newTbl.UnmarshalJSON(b); err != nil {
+		t.Fatal(err)
+	}
+
+	t.Errorf("\n%s\n", newTbl.String())
 }
 
-func TestTable(t *testing.T) {
-	type factPow struct {
-		factor, power int
-	}
+func BenchmarkJSON(b *testing.B) {
 
-	factorsStr := func(n int) string {
-		if n < 1 {
-			return ""
-		}
-
-		var (
-			factors  = math.Factor(n)
-			factPows = make([]factPow, 0, len(factors))
-		)
-
-		for factor, power := range factors {
-			factPows = append(factPows, factPow{factor: factor, power: power})
-		}
-
-		sort.Slice(
-			factPows,
-			func(i, j int) bool {
-				switch {
-				case factPows[i].factor < factPows[j].factor:
-					return true
-				case factPows[i].factor == factPows[j].factor:
-					return factPows[i].power < factPows[j].power
-				default:
-					return false
-				}
-			},
-		)
-
-		s := make([]string, 0, len(factors))
-		for _, fs := range factPows {
-			s = append(s, fmt.Sprintf("%d^%d", fs.factor, fs.power))
-		}
-
-		return strings.Join(s, " * ")
-	}
-
-	var (
-		index int
-		n     = 1 << 16
-		tbl   = New("Squared-Triangle Numbers", FltFmtNoExp, 0).SetHeader(NewHeader("index", "x", "y", "x+y", "x-y", "y^2-x", "facts(x+y)", "facts(x-y)", "gcd(x+y, x-y)"))
-	)
-
-	for x := 0; x < n; x++ {
-		T := (x*x + x) >> 1
-		for y := 0; y < n; y++ {
-			if S := y * y; T == S {
-				tbl.AppendRow(NewRow(index, x, y, x+y, x-y, S-x, factorsStr(x+y), factorsStr(x-y), math.GCD(x+y, x-y)))
-				index++
-			}
-		}
-	}
-
-	t.Fatalf("\n%s\n", tbl.String())
 }

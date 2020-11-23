@@ -2,288 +2,171 @@ package table
 
 import (
 	"encoding/csv"
-	"sort"
 	"strconv"
 	"strings"
+	"time"
 
-	"github.com/nathangreene3/math"
+	"github.com/tidwall/gjson"
 )
 
-// A Table holds rows/columns of data.
+// A Table holds tabular data.
 type Table struct {
-	header         Header
-	body           Body
-	colBaseTypes   []baseType
-	colWidths      []int
-	Name           string
-	rows, columns  int
-	floatPrecision FltPrecFmt
-	floatFmt       FltFmt
+	header Header
+	types  Types
+	body   Body
 }
 
-// FltFmt determines how float values are formatted when printed.
-type FltFmt byte
+// ---------------------------------------------------------------------------
+// Constructors
+// ---------------------------------------------------------------------------
 
-// FltPrecFmt defines the number of decimal positions displayed
-// for float values.
-type FltPrecFmt int
-
-const (
-	// FltFmtBinExp formats floats as a binary exponent value -dddp±ddd.
-	FltFmtBinExp FltFmt = 'b'
-
-	// FltFmtDecExp formats floats as a decimal exponent value -d.ddde±ddd.
-	FltFmtDecExp FltFmt = 'e'
-
-	// FltFmtNoExp formats floats as a decimal value -ddd.ddd.
-	FltFmtNoExp FltFmt = 'f'
-
-	// FltFmtLrgExp formats floats as a large exponent value -d.ddde±ddd.
-	FltFmtLrgExp FltFmt = 'g'
-)
-
-// New returns an empty table.
-func New(name string, floatFmt FltFmt, floatPrec FltPrecFmt, rows ...Row) *Table {
-	if floatFmt == 0 {
-		floatFmt = FltFmtNoExp
+// New returns a new table.
+func New(h Header, r ...Row) *Table {
+	t := Table{
+		header: append(make(Header, 0, len(h)), h...),
+		types:  make(Types, 0, len(h)),
+		body:   make(Body, 0, len(r)*len(h)),
 	}
 
-	t := &Table{
-		Name:           name,
-		header:         make(Header, 0),
-		body:           make(Body, 0, math.NextPowOfTwo(len(rows))),
-		colBaseTypes:   make([]baseType, 0),
-		colWidths:      make([]int, 0),
-		floatPrecision: floatPrec,
-		floatFmt:       floatFmt,
-	}
-
-	return t.AppendRows(rows...)
+	return t.Append(r...)
 }
 
-// ImportCSV imports a csv file into a new table.
-func ImportCSV(r csv.Reader, tableName string, fltFmt FltFmt, fltPrec FltPrecFmt) (*Table, error) {
+// FromCSV returns a new table with data read from a csv reader.
+func FromCSV(r *csv.Reader) (*Table, error) {
 	lines, err := r.ReadAll()
 	if err != nil {
 		return nil, err
 	}
 
-	t := New(tableName, fltFmt, fltPrec)
-	if 0 < len(lines) {
-		t.SetHeader(lines[0])
+	if len(lines) == 0 {
+		return New(NewHeader()), nil
 	}
 
+	t := New(NewHeader(lines[0]...))
 	for i := 1; i < len(lines); i++ {
 		r := make(Row, 0, len(lines[i]))
 		for j := 0; j < len(lines[i]); j++ {
-			r = append(r, parse(lines[i][j]))
+			if n, err := strconv.ParseInt(lines[i][j], 10, strconv.IntSize); err == nil {
+				r = append(r, int(n))
+				continue
+			}
+
+			if f, err := strconv.ParseFloat(lines[i][j], strconv.IntSize); err == nil {
+				r = append(r, f)
+				continue
+			}
+
+			if b, err := strconv.ParseBool(lines[i][j]); err == nil {
+				r = append(r, b)
+				continue
+			}
+
+			if tm, err := time.Parse(time.RFC3339Nano, lines[i][j]); err == nil {
+				r = append(r, tm)
+				continue
+			}
+
+			r = append(r, lines[i][j])
 		}
 
-		t.AppendRow(r)
+		t.Append(r)
 	}
 
 	return t, nil
 }
 
-// AppendColumn to a table. If the column header and column is empty, nothing
-// happens.
-func (t *Table) AppendColumn(columnHeader string, c Column) *Table {
-	if len(columnHeader) == 0 && c.isEmpty() {
-		return t
-	}
+// FromJSON returns a new table with data parsed from a json-encoded string.
+// This string should adhere to the following format.
+// 	{"header":["", ...],"types":[0, ...],"body":["", ...]}
+func FromJSON(s string) *Table {
+	var (
+		headerResults = gjson.Get(s, "header").Array()
+		h             = make(Header, 0, len(headerResults))
+	)
 
-	// Increase body size to column size
-	for t.rows < len(c) {
-		t.AppendRow(make(Row, t.columns))
-	}
-
-	// Increase column size to body size
-	for len(c) < t.rows {
-		c = append(c, nil)
-	}
-
-	t.header = append(t.header, strings.TrimSpace(columnHeader))
-	for i := 0; i < len(t.body); i++ {
-		t.body[i] = append(t.body[i], c[i])
-	}
-
-	t.columns++
-	t.colBaseTypes[t.columns-1] = t.minColBaseType(t.columns - 1)
-	return t
-}
-
-// AppendRow to a table.
-func (t *Table) AppendRow(r Row) *Table {
-	if r.isEmpty() {
-		return t
-	}
-
-	n := len(r)
-	t.setColSize(n)
-	t.body = append(t.body, r)
-	t.rows++
-
-	var w int
-	for i := 0; i < n; i++ {
-		switch t.colBaseTypes[i] {
-		case integerType:
-			switch baseTypeOf(r[i]) {
-			case integerType:
-				w = len(strconv.Itoa(r[i].(int)))
-			case floatType:
-				t.colBaseTypes[i] = floatType
-				w = len(strconv.FormatFloat(r[i].(float64), byte(t.floatFmt), int(t.floatPrecision), 64))
-			case stringType:
-				t.colBaseTypes[i] = stringType
-				w = len(r[i].(string))
-			default:
-				panic("unknown type")
-			}
-		case floatType:
-			switch baseTypeOf(r[i]) {
-			case integerType:
-				w = len(strconv.FormatFloat(float64(r[i].(int)), byte(t.floatFmt), int(t.floatPrecision), 64))
-			case floatType:
-				w = len(strconv.FormatFloat(r[i].(float64), byte(t.floatFmt), int(t.floatPrecision), 64))
-			case stringType:
-				t.colBaseTypes[i] = stringType
-				w = len(r[i].(string))
-			default:
-				panic("unknown type")
-			}
-		case stringType:
-			switch baseTypeOf(r[i]) {
-			case integerType:
-				w = len(strconv.Itoa(r[i].(int)))
-			case floatType:
-				w = len(strconv.FormatFloat(r[i].(float64), byte(t.floatFmt), int(t.floatPrecision), 64))
-			case stringType:
-				t.colBaseTypes[i] = stringType
-				w = len(r[i].(string))
-			default:
-				panic("unknown type")
-			}
-		}
-
-		if t.colWidths[i] < w {
-			t.colWidths[i] = w
-		}
-	}
-
-	return t
-}
-
-// AppendRows ...
-func (t *Table) AppendRows(rows ...Row) *Table {
-	for i := 0; i < len(rows); i++ {
-		t.AppendRow(rows[i])
-	}
-
-	return t
-}
-
-// Clean removes empty rows and columns.
-func (t *Table) Clean() *Table {
-	// Remove empty rows
-	for i := t.rows - 1; 0 <= i; i-- {
-		if t.body[i].isEmpty() {
-			t.RemoveRow(i)
-		}
-	}
-
-	// Remove empty columns. Named columns are ignored.
-	for j := t.columns - 1; 0 <= j; j-- {
-		if isEmpty := len(t.header[j]) == 0; isEmpty {
-			for i := 0; i < t.rows && isEmpty; i++ {
-				isEmpty = t.body[i][j] == nil
-			}
-
-			if isEmpty {
-				t.RemoveColumn(j)
-			}
-		}
-	}
-
-	return t.updateBaseTypesAndWidths()
-}
-
-// Column returns the column header and a copy of the column at a
-// given index.
-func (t *Table) Column(j int) (string, Column) {
-	c := make(Column, 0, len(t.body))
-	for i := 0; i < len(t.body); i++ {
-		c = append(c, t.body[i][j])
-	}
-
-	return t.header[j], c
-}
-
-// ColumnHeader at a given index.
-func (t *Table) ColumnHeader(i int) string {
-	return t.header[i]
-}
-
-// TODO: t.Compare
-
-// Copy a table.
-func (t *Table) Copy() *Table {
-	return New(t.Name, t.floatFmt, t.floatPrecision, t.body...).SetHeader(t.header)
-}
-
-// Dimensions returns the number of rows and columns of a table.
-func (t *Table) Dimensions() (int, int) {
-	if 0 < len(t.body) {
-		return len(t.body), len(t.body[0])
-	}
-
-	return 0, 0
-}
-
-// updateBaseTypesAndWidths a table. This updates each column base type to its
-// weakest base type and updates each column width to the largest
-// each needs to be when updateBaseTypesAndWidthsed as a string.
-func (t *Table) updateBaseTypesAndWidths() *Table {
-	// Reset each column updateBaseTypesAndWidths as an integer and to be as wide as the column
-	// header. Each column base type is used to determine alignment and doesn't
-	// affect the updateBaseTypesAndWidthsting of each (i,j)th value.
-	for i := 0; i < t.columns; i++ {
-		t.colBaseTypes[i] = integerType
-		t.colWidths[i] = len(t.header[i])
+	for i := 0; i < len(headerResults); i++ {
+		h = append(h, headerResults[i].String())
 	}
 
 	var (
-		bt baseType
-		w  int
+		t           = New(h)
+		bodyResults = gjson.Get(s, "body").Array()
 	)
 
-	for i := 0; i < len(t.body); i++ {
-		for j := 0; j < len(t.body[i]); j++ {
-			// Set the jth column base type to the minimum (weakest) base type
-			// found in each value at (i,j). Recall from base_type.go that
-			// strings < floats < ints. Then update the jth column width
-			// depending on the weakest base type found.
+	if 0 < len(bodyResults) {
+		var (
+			typeResults = gjson.Get(s, "types").Array()
+			r           = make(Row, len(headerResults))
+		)
 
-			// minColBaseType is not appropriate here because the (i,j)th value
-			// is not reset in dependence on the minimum column base type
-			// returned.
-			if bt = baseTypeOf(t.body[i][j]); bt < t.colBaseTypes[j] {
-				t.colBaseTypes[j] = bt
+		for i := 0; i < len(bodyResults); i++ {
+			rowResults := bodyResults[i].Array()
+			for j := 0; j < len(headerResults); j++ {
+				switch Type(typeResults[j].Int()) {
+				case Int:
+					r[j] = int(rowResults[j].Int())
+				case Flt:
+					r[j] = float64(rowResults[j].Float())
+				case Bool:
+					r[j] = bool(rowResults[j].Bool())
+				case Time:
+					d, err := time.Parse(time.RFC3339Nano, rowResults[j].String())
+					if err != nil {
+						panic(err.Error())
+					}
+
+					r[j] = d
+				case Str:
+					r[j] = rowResults[j].String()
+				default:
+					panic("invalid type")
+				}
 			}
 
-			// Determine the width of the (i,j)th value when converted to its base type and update the column width if the column width is too small to support it.
-			switch bt {
-			case integerType:
-				w = len(strconv.Itoa(t.body[i][j].(int)))
-			case floatType:
-				w = len(strconv.FormatFloat(t.body[i][j].(float64), byte(t.floatFmt), int(t.floatPrecision), 64))
-			case stringType:
-				w = len(t.body[i][j].(string))
-			default:
-				panic("unknown base type")
+			t.Append(r)
+		}
+	}
+
+	return t
+}
+
+// ---------------------------------------------------------------------------
+// Methods
+// ---------------------------------------------------------------------------
+
+// Append ...
+func (t *Table) Append(r ...Row) *Table {
+	if 0 < len(r) {
+		var i int
+		if len(t.body) == 0 {
+			if len(t.header) != len(r[0]) {
+				panic("dimension mismatch")
 			}
 
-			if t.colWidths[j] < w {
-				t.colWidths[j] = w
+			for j := 0; j < len(r[0]); j++ {
+				switch tp := Parse(r[0][j]); tp {
+				case Int, Flt, Bool, Time, Str:
+					t.types = append(t.types, tp)
+					t.body = append(t.body, r[0][j])
+				default:
+					panic("invalid type")
+				}
+			}
+
+			i++
+		}
+
+		for ; i < len(r); i++ {
+			if len(t.header) != len(r[i]) {
+				panic("dimension mismatch")
+			}
+
+			for j := 0; j < len(r[i]); j++ {
+				if t.types[j] != Parse(r[i][j]) {
+					panic("invalid type")
+				}
+
+				t.body = append(t.body, r[i][j])
 			}
 		}
 	}
@@ -291,284 +174,341 @@ func (t *Table) updateBaseTypesAndWidths() *Table {
 	return t
 }
 
-// Get returns the (i,j)th value.
-func (t *Table) Get(i, j int) interface{} {
-	return t.body[i][j]
-}
-
-// Header returns a copy of the header.
-func (t *Table) Header() Header {
-	return t.header.Copy()
-}
-
-// minColBaseType returns the smallest base type found in column j.
-func (t *Table) minColBaseType(j int) baseType {
-	min := integerType
-	for i := 0; i < len(t.body); i++ {
-		if bt := baseTypeOf(t.body[i][j]); bt < min {
-			min = bt
-		}
+// AppendCol ...
+func (t *Table) AppendCol(colName string, c Column) *Table {
+	m, n := t.Dims()
+	if m != len(c) {
+		panic("dimension mismatch")
 	}
 
-	return min
-}
-
-// RemoveColumn from a table.
-func (t *Table) RemoveColumn(i int) (string, Column) {
-	h := t.header[i]
-	c := make(Column, 0, t.rows)
-	if i+1 == t.columns {
-		t.header = t.header[:i]
-		for j := 0; j < len(t.body); j++ {
-			c = append(c, t.body[j][i])
-			t.body[j] = t.body[j][:i]
-		}
-	} else {
-		t.header = append(t.header[:i], t.header[i+1:]...)
-		for j := 0; j < len(t.body); j++ {
-			c = append(c, t.body[j][i])
-			t.body[j] = append(t.body[j][:i], t.body[j][:i+1]...)
-		}
-	}
-
-	t.columns--
-
-	// Remove empty rows
-	for j := 0; j < t.rows; j++ {
-		if t.body[j].isEmpty() {
-			if j+1 == t.rows {
-				t.body = t.body[:j]
-			} else {
-				t.body = append(t.body[:j], t.body[j+1:]...)
+	t.header = append(t.header, colName)
+	if 0 < m {
+		t.types = append(t.types, Parse(c[0]))
+		if m+len(t.body) <= cap(t.body) {
+			t.body = append(t.body, make([]interface{}, m)...)
+			for i := m - 1; 0 < i; i-- {
+				t.body[i*n+i+n] = c[i]
+				copy(t.body[i*n+i:i*n+i+n], t.body[i*n:i*n+n])
 			}
 
-			t.rows--
+			t.body[n] = c[0]
+		} else {
+			b := make(Body, 0, (m+1)*n)
+			for i := 0; i < m; i++ {
+				b = append(append(b, t.body[i*n:(i+1)*n]...), c[i])
+			}
+
+			t.body = b
 		}
 	}
 
-	return h, c
+	return t
 }
 
-// RemoveRow from a table.
-func (t *Table) RemoveRow(i int) Row {
-	r := t.body[i]
-	if i+1 == t.rows {
-		t.body = t.body[:i]
-	} else {
-		t.body = append(t.body[:i], t.body[i+1:]...)
+// Col ...
+func (t *Table) Col(j int) []interface{} {
+	m, n := t.Dims()
+	if n <= j {
+		panic("index out of range")
 	}
 
-	t.rows--
-	t.Clean()
+	c := make([]interface{}, 0, m)
+	for ; j < len(t.body); j += n {
+		c = append(c, t.body[j])
+	}
+
+	return c
+}
+
+// ColFmt ...
+func (t *Table) ColFmt(j int) Type {
+	return t.types[j]
+}
+
+// ColFlts ...
+func (t *Table) ColFlts(j int) []float64 {
+	m, n := t.Dims()
+	if n <= j {
+		panic("index out of range")
+	}
+
+	c := make([]float64, 0, m)
+	for ; j < len(t.body); j += n {
+		c = append(c, t.body[j].(float64))
+	}
+
+	return c
+}
+
+// ColInts ...
+func (t *Table) ColInts(j int) []int {
+	m, n := t.Dims()
+	if n <= j {
+		panic("index out of range")
+	}
+
+	c := make([]int, 0, m)
+	for ; j < len(t.body); j += n {
+		c = append(c, t.body[j].(int))
+	}
+
+	return c
+}
+
+// ColStrs ...
+func (t *Table) ColStrs(j int) []string {
+	m, n := t.Dims()
+	if n <= j {
+		panic("index out of range")
+	}
+
+	c := make([]string, 0, m)
+	for ; j < len(t.body); j += n {
+		c = append(c, t.body[j].(string))
+	}
+
+	return c
+}
+
+// Copy ...
+func (t *Table) Copy() *Table {
+	cpy := Table{
+		header: append(make(Header, 0, len(t.header)), t.header...),
+		types:  append(make(Types, 0, len(t.types)), t.types...),
+		body:   append(make(Body, 0, len(t.body)), t.body...),
+	}
+
+	return &cpy
+}
+
+// Dims ...
+func (t *Table) Dims() (int, int) {
+	m, n := len(t.body), len(t.header)
+	if 0 < n {
+		m /= n
+	}
+
+	return m, n
+}
+
+// Equal ...
+func (t *Table) Equal(tbl *Table) bool {
+	return t.header.Equal(tbl.header) && t.types.Equal(tbl.types) && t.body.Equal(tbl.body)
+}
+
+// Get ...
+func (t *Table) Get(i, j int) interface{} {
+	return t.body[i*len(t.header)+j]
+}
+
+// GetFlt ...
+func (t *Table) GetFlt(i, j int) float64 {
+	return t.body[i*len(t.header)+j].(float64)
+}
+
+// GetInt ...
+func (t *Table) GetInt(i, j int) int {
+	return t.body[i*len(t.header)+j].(int)
+}
+
+// GetStr ...
+func (t *Table) GetStr(i, j int) string {
+	return t.body[i*len(t.header)+j].(string)
+}
+
+// Header ...
+func (t *Table) Header() Header {
+	return append(make(Header, 0, len(t.header)), t.header...)
+}
+
+// Insert ...
+func (t *Table) Insert(i int, r Row) *Table {
+	m, _ := t.Dims()
+	return t.Append(r).Swap(i, m)
+}
+
+// InsertCol ...
+func (t *Table) InsertCol(i int, colName string, c Column) *Table {
+	_, n := t.Dims()
+	return t.AppendCol(colName, c).SwapCols(i, n)
+}
+
+// MarshalJSON ...
+func (t *Table) MarshalJSON() ([]byte, error) {
+	return []byte(t.ToJSON()), nil
+}
+
+// Remove ...
+func (t *Table) Remove(i int) Row {
+	var (
+		_, n = t.Dims()
+		r    = NewRow(t.body[i*n : (i+1)*n]...)
+	)
+
+	t.body = append(t.body[:i*n], t.body[(i+1)*n:]...)
+	if len(t.body) < n {
+		t.types = t.types[:0]
+	}
+
 	return r
 }
 
-// Row returns a copy of a row.
+// RemoveCol ...
+func (t *Table) RemoveCol(j int) (string, Column) {
+	var (
+		m, n   = t.Dims()
+		name   = t.header[j]
+		column = make([]interface{}, 0, m)
+	)
+
+	t.header = append(t.header[:j], t.header[j+1:]...)
+	t.types = append(t.types[:j], t.types[j+1:]...)
+	if 0 < m {
+		for i := 0; i+1 < m; i++ {
+			ij := i*n + j
+			column = append(column, t.body[ij])
+			copy(t.body[ij-i:ij-i+n-1], t.body[ij+1:ij+n])
+		}
+
+		ij := len(t.body) - n + j
+		column = append(column, t.body[ij])
+		t.body = append(t.body[:ij-m+1], t.body[ij+1:]...)
+	}
+
+	return name, column
+}
+
+// Row ...
 func (t *Table) Row(i int) Row {
-	return t.body[i].Copy()
+	_, n := t.Dims()
+	return NewRow(t.body[i*n : (i+1)*n]...)
 }
 
-// Set the (i,j)th cell to a given value.
-func (t *Table) Set(v interface{}, i, j int) *Table {
-	t.body[i][j] = v
+// Rows ...
+func (t *Table) Rows() []Row {
+	var (
+		m, n = t.Dims()
+		rs   = make([]Row, 0, m)
+	)
+
+	for i := 0; i < m; i++ {
+		rs = append(rs, NewRow(t.body[i*n:(i+1)*n]))
+	}
+
+	return rs
+}
+
+// Set ...
+func (t *Table) Set(i, j int, v interface{}) *Table {
+	if t.types[j] != Parse(v) {
+		panic("invalid type")
+	}
+
+	_, n := t.Dims()
+	t.body[i*n+j] = v
 	return t
 }
 
-// SetBody ...
-func (t *Table) SetBody(b Body) *Table {
-	t.body = make(Body, 0, math.NextPowOfTwo(len(b)))
-	t.rows = 0
-	return t.Clean().AppendRows(b...)
-}
-
-// SetColHeader to a given value.
-func (t *Table) SetColHeader(columnHeader string, i int) *Table {
-	t.header[i] = strings.TrimSpace(columnHeader)
+// Sort ...
+func (t *Table) Sort(j int) *Table {
+	// TODO
 	return t
 }
 
-// setColSize to a given size n. Empty strings will be appended.
-func (t *Table) setColSize(n int) *Table {
-	t.columns = n
-	for len(t.header) < n {
-		t.header = append(t.header, "")
-	}
-
-	for n < len(t.header) {
-		t.header = append(t.header, "")
-	}
-
-	for i := 0; i < len(t.body); i++ {
-		for len(t.body[i]) < n {
-			t.body[i] = append(t.body[i], nil)
-		}
-
-		for n < len(t.body[i]) {
-			t.body[i] = append(t.body[i], nil)
-		}
-	}
-
-	for len(t.colBaseTypes) < n {
-		t.colBaseTypes = append(t.colBaseTypes, integerType)
-	}
-
-	for n < len(t.colBaseTypes) {
-		t.colBaseTypes = append(t.colBaseTypes, integerType)
-	}
-
-	for len(t.colWidths) < n {
-		t.colWidths = append(t.colWidths, 0)
-	}
-
-	for n < len(t.colWidths) {
-		t.colWidths = append(t.colWidths, 0)
-	}
-
-	return t
-}
-
-// SetFloatFmt defines how float values are displayed, if any are present.
-func (t *Table) SetFloatFmt(f FltFmt) *Table {
-	t.floatFmt = f
-	return t
-}
-
-// SetFloatPrecFmt defines how many digits will be displayed after a decimal
-// value, if any are present.
-func (t *Table) SetFloatPrecFmt(f FltPrecFmt) *Table {
-	t.floatPrecision = f
-	return t
-}
-
-// SetHeader sets the header field.
-func (t *Table) SetHeader(h Header) *Table {
-	n := len(h)
-	t.setColSize(n)
-	for i := 0; i < n; i++ {
-		t.header[i] = strings.TrimSpace(h[i])
-		if w := len(h[i]); t.colWidths[i] < w { // TODO: should this be t.header[i]?
-			t.colWidths[i] = w
-		}
-	}
-
-	return t
-}
-
-// SetMinFormat for each table value within the context of its column format.
-// That is, this sets the (i,j)th entry to the base type found in each column.
-// WARNING: This will wipe out the original data and cannot be undone.
-func (t *Table) SetMinFormat() *Table {
-	for j := 0; j < t.columns; j++ {
-		t.colBaseTypes[j] = t.minColBaseType(j)
-	}
-
-	for i := 0; i < t.rows; i++ {
-		for j := 0; j < t.columns; j++ {
-			// Update each (i,j)th value to the jth column base type.
-			switch baseTypeOf(t.body[i][j]) {
-			case integerType:
-				switch t.colBaseTypes[j] {
-				case integerType: // Do nothing
-				case floatType:
-					t.body[i][j] = float64(t.body[i][j].(int)) // Convert to float64
-				case stringType:
-					t.body[i][j] = strconv.Itoa(t.body[i][j].(int)) // Convert to string
-				default:
-					panic("unknown base type")
-				}
-			case floatType:
-				switch t.colBaseTypes[j] {
-				case integerType: // Do nothing? Data loss if we convert float to int
-				case floatType: // Do nothing
-				case stringType:
-					if x := strconv.FormatFloat(t.body[i][j].(float64), 'f', -1, 64); strings.ContainsRune(x, '.') {
-						t.body[i][j] = x
-					} else {
-						t.body[i][j] = x + ".0"
-					}
-				default:
-					panic("unknown base type")
-				}
-			case stringType: // Do nothing
-			default:
-				panic("unknown base type")
-			}
-		}
-	}
-
-	return t
-}
-
-// Sort the table's body.
-func (t *Table) Sort() *Table {
-	sort.Slice(t.body, func(i, j int) bool { return t.body[i].Compare(t.body[j]) < 0 })
-	return t
-}
-
-// SortOnCol sorts the table body by only comparing the given column index.
-func (t *Table) SortOnCol(colIndex int) *Table {
-	sort.Slice(t.body, func(i, j int) bool { return t.body[i].CompareAt(t.body[j], colIndex) < 0 })
-	return t
-}
-
-// String returns a string-representation of a table.
+// String ...
 func (t *Table) String() string {
-	// Create horizontal line
+	var (
+		n  = len(t.header)
+		ws = make([]int, n)
+	)
+
+	for j := 0; j < n; j++ {
+		if ws[j] < len(t.header[j]) {
+			ws[j] = len(t.header[j])
+		}
+	}
+
+	b := t.body.Strings()
+	for i := 0; i < len(b); i++ {
+		if ws[i%n] < len(b[i]) {
+			ws[i%n] = len(b[i])
+		}
+	}
+
+	hs := make([]string, 0, n)
+	for j := 0; j < n; j++ {
+		hs = append(hs, strings.Repeat("-", ws[j]+2))
+	}
+
+	h := "+" + strings.Join(hs, "+") + "+"
+
 	var sb strings.Builder
-	for i := 0; i < len(t.colWidths); i++ {
-		sb.WriteString("+" + strings.Repeat("-", t.colWidths[i]))
-	}
-
-	sb.WriteString("+\n")
-	hLine := sb.String()
-	sb.Reset()
-
-	// Write header
-	sb.WriteString(hLine)
-	for i := 0; i < t.columns; i++ {
-		switch t.colBaseTypes[i] {
-		case integerType, floatType:
-			sb.WriteString("|" + strings.Repeat(" ", t.colWidths[i]-len(t.header[i])) + t.header[i])
-		case stringType:
-			sb.WriteString("|" + t.header[i] + strings.Repeat(" ", t.colWidths[i]-len(t.header[i])))
+	sb.WriteString("\n" + h + "\n|")
+	for j := 0; j < n; j++ {
+		switch t.types[j] {
+		case Flt, Int:
+			sb.WriteString(strings.Repeat(" ", ws[j]-len(t.header[j])+1) + t.header[j] + " |")
+		case Bool, Time, Str:
+			sb.WriteString(" " + t.header[j] + strings.Repeat(" ", ws[j]-len(t.header[j])+1) + "|")
+		default:
 		}
 	}
 
-	sb.WriteString("|\n" + hLine)
-
-	// Write body
-	for i := 0; i < t.rows; i++ {
-		for j := 0; j < t.columns; j++ {
-			var s string
-			switch baseTypeOf(t.body[i][j]) {
-			case integerType:
-				s = strconv.Itoa(t.body[i][j].(int))
-			case floatType:
-				s = strconv.FormatFloat(t.body[i][j].(float64), byte(t.floatFmt), int(t.floatPrecision), 64)
-			case stringType:
-				s = t.body[i][j].(string)
-			}
-
-			switch t.colBaseTypes[j] {
-			case integerType, floatType:
-				sb.WriteString("|" + strings.Repeat(" ", t.colWidths[j]-len(s)) + s)
-			case stringType:
-				sb.WriteString("|" + s + strings.Repeat(" ", t.colWidths[j]-len(s)))
+	sb.WriteString("\n" + h)
+	for i := 0; i < len(b); i += n {
+		sb.WriteString("\n|")
+		for j, k := 0, i; j < n && k < len(b); j, k = j+1, k+1 {
+			switch t.types[j] {
+			case Flt, Int:
+				// Right-aligned
+				sb.WriteString(strings.Repeat(" ", ws[j]-len(b[k])+1) + b[k] + " |")
+			case Bool, Time, Str:
+				// Left-aligned
+				sb.WriteString(" " + b[k] + strings.Repeat(" ", ws[j]-len(b[k])+1) + "|")
 			}
 		}
-
-		sb.WriteString("|\n")
 	}
 
-	sb.WriteString(hLine)
+	sb.WriteString("\n" + h)
 	return sb.String()
 }
 
-// Strings returns a list of lists-of-strings representing a table.
+// Strings ...
 func (t *Table) Strings() [][]string {
-	ss := append(make([][]string, 0, t.rows+1), t.header) // Header is the first row
-	for i := 0; i < len(t.body); i++ {
-		ss = append(ss, t.body[i].Strings())
+	var (
+		m, n = t.Dims()
+		ss   = make([][]string, 0, m+1)
+		h    = make([]string, 0, n)
+	)
+
+	for j := 0; j < len(t.header); j++ {
+		h = append(h, t.header[j])
+	}
+
+	ss = append(ss, h)
+	for i := 0; i < m; i++ {
+		r := make([]string, 0, n)
+		for j := 0; j < n; j++ {
+			switch t.types[j] {
+			case Bool:
+				r = append(r, strconv.FormatBool(t.body[i*n+j].(bool)))
+			case Flt:
+				if v := t.body[i*n+j].(float64); v == float64(int64(v)) {
+					r = append(r, strconv.FormatFloat(v, 'f', 1, 64)) // Forces f.0
+				} else {
+					r = append(r, strconv.FormatFloat(v, 'f', -1, 64))
+				}
+			case Int:
+				r = append(r, strconv.Itoa(t.body[i*n+j].(int)))
+			case Time:
+				r = append(r, t.body[i*n+j].(time.Time).Format(time.RFC3339Nano))
+			case Str:
+				r = append(r, t.body[i*n+j].(string))
+			default:
+			}
+		}
+
+		ss = append(ss, r)
 	}
 
 	return ss
@@ -576,19 +516,131 @@ func (t *Table) Strings() [][]string {
 
 // Swap ...
 func (t *Table) Swap(i, j int) *Table {
-	t.body.Swap(i, j)
+	_, n := t.Dims()
+	for k := 0; k < n; k++ {
+		ik, jk := i*n+k, j*n+k
+		t.body[ik], t.body[jk] = t.body[jk], t.body[ik]
+	}
+
 	return t
 }
 
 // SwapCols ...
-func (t *Table) SwapCols(i, j int) {
-	t.header.Swap(i, j)
-	t.body.SwapCols(i, j)
-	t.colBaseTypes[i], t.colBaseTypes[j] = t.colBaseTypes[j], t.colBaseTypes[i]
-	t.colWidths[i], t.colWidths[j] = t.colWidths[j], t.colWidths[i]
+func (t *Table) SwapCols(i, j int) *Table {
+	t.header[i], t.header[j] = t.header[j], t.header[i]
+	t.types[i], t.types[j] = t.types[j], t.types[i]
+
+	_, n := t.Dims()
+	for kn := 0; kn < len(t.body); kn += n {
+		t.body[kn+i], t.body[kn+j] = t.body[kn+j], t.body[kn+i]
+	}
+
+	return t
 }
 
-// ExportCSV to a csv writer.
-func (t *Table) ExportCSV(w csv.Writer) error {
-	return w.WriteAll(t.Clean().Strings())
+// ToCSV ...
+func (t *Table) ToCSV(w *csv.Writer) error {
+	return w.WriteAll(t.Strings())
+}
+
+// ToJSON ...
+func (t *Table) ToJSON() string {
+	m, n := t.Dims()
+	if n == 0 {
+		return "{\"header\":[],\"types\":[],\"body\":[]}"
+	}
+
+	var sb strings.Builder
+	sb.Grow((m + 3) * n * 8)
+	sb.WriteString("{\"header\":[\"" + strings.Join([]string(t.header), "\",\"") + "\"],\"types\":[" + strconv.Itoa(int(t.types[0])))
+	for j := 1; j < n; j++ {
+		sb.WriteString("," + strconv.Itoa(int(t.types[j])))
+	}
+
+	sb.WriteString("],\"body\":[")
+	if 0 < m {
+		sb.WriteByte('[')
+		switch t.types[0] {
+		case Int:
+			sb.WriteString(strconv.FormatInt(int64(t.body[0].(int)), 10))
+		case Flt:
+			sb.WriteString(strconv.FormatFloat(float64(t.body[0].(float64)), 'f', -1, 64))
+		case Bool:
+			sb.WriteString("\"" + strconv.FormatBool(t.body[0].(bool)) + "\"")
+		case Time:
+			sb.WriteString(",\"" + t.body[0].(time.Time).Format(time.RFC3339Nano) + "\"")
+		case Str:
+			sb.WriteString("\"" + t.body[0].(string) + "\"")
+		default:
+		}
+
+		for j := 1; j < n; j++ {
+			switch t.types[j] {
+			case Int:
+				sb.WriteString("," + strconv.FormatInt(int64(t.body[j].(int)), 10))
+			case Flt:
+				sb.WriteString("," + strconv.FormatFloat(t.body[j].(float64), 'f', -1, 64))
+			case Bool:
+				sb.WriteString(",\"" + strconv.FormatBool(t.body[j].(bool)) + "\"")
+			case Time:
+				sb.WriteString(",\"" + t.body[j].(time.Time).String() + "\"")
+			case Str:
+				sb.WriteString(",\"" + t.body[j].(string) + "\"")
+			default:
+			}
+		}
+
+		sb.WriteByte(']')
+		for i := 1; i < m; i++ {
+			sb.WriteString(",[")
+			switch t.types[0] {
+			case Int:
+				sb.WriteString(strconv.FormatInt(int64(t.body[i*n].(int)), 10))
+			case Flt:
+				sb.WriteString(strconv.FormatFloat(t.body[i*n].(float64), 'f', -1, 64))
+			case Bool:
+				sb.WriteString("\"" + strconv.FormatBool(t.body[i*n].(bool)) + "\"")
+			case Time:
+				sb.WriteString(",\"" + t.body[i*n].(time.Time).String() + "\"")
+			case Str:
+				sb.WriteString("\"" + t.body[i*n].(string) + "\"")
+			default:
+			}
+
+			for j := 1; j < n; j++ {
+				switch t.types[j] {
+				case Int:
+					sb.WriteString("," + strconv.FormatInt(int64(t.body[i*n+j].(int)), 10))
+				case Flt:
+					sb.WriteString("," + strconv.FormatFloat(t.body[i*n+j].(float64), 'f', -1, 64))
+				case Bool:
+					sb.WriteString(",\"" + strconv.FormatBool(t.body[i*n+j].(bool)) + "\"")
+				case Time:
+					sb.WriteString(",\"" + t.body[i*n+j].(time.Time).String() + "\"")
+				case Str:
+					sb.WriteString(",\"" + t.body[i*n+j].(string) + "\"")
+				default:
+				}
+			}
+
+			sb.WriteString("]")
+		}
+	}
+
+	sb.WriteString("]}")
+	return sb.String()
+}
+
+// Types ...
+func (t *Table) Types() Types {
+	return append(make(Types, 0, len(t.types)), t.types...)
+}
+
+// UnmarshalJSON ...
+func (t *Table) UnmarshalJSON(b []byte) error {
+	if t1 := FromJSON(string(b)); t1 != nil {
+		*t = *t1
+	}
+
+	return nil
 }

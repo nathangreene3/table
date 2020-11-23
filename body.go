@@ -1,54 +1,67 @@
 package table
 
 import (
-	math "github.com/nathangreene3/math"
+	"strconv"
+	"time"
 )
 
 // Body ...
-type Body []Row
+type Body []interface{}
 
 // NewBody ...
-func NewBody(rows ...Row) Body {
-	b := make(Body, 0, len(rows))
-	for i := 0; i < len(rows); i++ {
-		b = append(b, rows[i].Copy())
-	}
-
-	return b
-}
-
-// Compare ...
-func (b Body) Compare(body Body) int {
-	minIndex := math.MinInt(len(b), len(body))
-	for i := 0; i < minIndex; i++ {
-		if c := b[i].Compare(body[i]); c != 0 {
-			return c
-		}
-	}
-
-	switch {
-	case len(b) < len(body):
-		return -1
-	case len(body) < len(b):
-		return 1
-	default:
-		return 0
-	}
+func NewBody(values ...interface{}) Body {
+	return append(make(Body, 0, len(values)), values...)
 }
 
 // Copy ...
 func (b Body) Copy() Body {
-	return NewBody(b...)
+	return append(make(Body, 0, len(b)), b...)
 }
 
-// Swap ...
-func (b Body) Swap(i, j int) {
-	b[i], b[j] = b[j], b[i]
-}
-
-// SwapCols ...
-func (b Body) SwapCols(i, j int) {
-	for i := 0; i < len(b); i++ {
-		b[i].Swap(i, j)
+// Equal ...
+func (b Body) Equal(bdy Body) bool {
+	if len(b) != len(bdy) {
+		return false
 	}
+
+	for i := 0; i < len(b); i++ {
+		if b[i] != bdy[i] {
+			return false
+		}
+	}
+
+	return true
+}
+
+// Strings ...
+func (b Body) Strings() []string {
+	ss := make([]string, 0, len(b))
+	for i := 0; i < len(b); i++ {
+		switch Parse(b[i]) {
+		case Int:
+			ss = append(ss, strconv.Itoa(b[i].(int)))
+		case Flt:
+			ss = append(ss, strconv.FormatFloat(b[i].(float64), 'f', -1, 64))
+		case Bool:
+			ss = append(ss, strconv.FormatBool(b[i].(bool)))
+		case Time:
+			ss = append(ss, b[i].(time.Time).Format(time.RFC3339Nano))
+		case Str:
+			ss = append(ss, b[i].(string))
+		default:
+			ss = append(ss, "")
+		}
+	}
+
+	return ss
+}
+
+// Types ...
+func (b Body) Types() Types {
+	ts := make(Types, 0, len(b))
+	for i := 0; i < len(b); i++ {
+		ts = append(ts, Parse(b[i]))
+	}
+
+	return ts
 }
