@@ -61,8 +61,8 @@ func FromCSV(r *csv.Reader) (*Table, error) {
 				continue
 			}
 
-			if tm, err := time.Parse(time.RFC3339Nano, lines[i][j]); err == nil {
-				r = append(r, tm)
+			if t, err := time.Parse(time.RFC3339Nano, lines[i][j]); err == nil {
+				r = append(r, t)
 				continue
 			}
 
@@ -119,7 +119,7 @@ func FromJSON(s string) *Table {
 				case Str:
 					r[j] = rowResults[j].String()
 				default:
-					panic("invalid type")
+					panic(errType.Error())
 				}
 			}
 
@@ -134,13 +134,13 @@ func FromJSON(s string) *Table {
 // Methods
 // ---------------------------------------------------------------------------
 
-// Append ...
+// Append several rows to a table.
 func (t *Table) Append(r ...Row) *Table {
 	if 0 < len(r) {
 		var i int
 		if len(t.body) == 0 {
 			if len(t.header) != len(r[0]) {
-				panic("dimension mismatch")
+				panic(errDims.Error())
 			}
 
 			for j := 0; j < len(r[0]); j++ {
@@ -149,7 +149,7 @@ func (t *Table) Append(r ...Row) *Table {
 					t.types = append(t.types, tp)
 					t.body = append(t.body, r[0][j])
 				default:
-					panic("invalid type")
+					panic(errType.Error())
 				}
 			}
 
@@ -158,12 +158,12 @@ func (t *Table) Append(r ...Row) *Table {
 
 		for ; i < len(r); i++ {
 			if len(t.header) != len(r[i]) {
-				panic("dimension mismatch")
+				panic(errDims.Error())
 			}
 
 			for j := 0; j < len(r[i]); j++ {
 				if t.types[j] != Parse(r[i][j]) {
-					panic("invalid type")
+					panic(errType.Error())
 				}
 
 				t.body = append(t.body, r[i][j])
@@ -174,11 +174,11 @@ func (t *Table) Append(r ...Row) *Table {
 	return t
 }
 
-// AppendCol ...
+// AppendCol appends a column to a table.
 func (t *Table) AppendCol(colName string, c Column) *Table {
 	m, n := t.Dims()
 	if m != len(c) {
-		panic("dimension mismatch")
+		panic(errDims.Error())
 	}
 
 	t.header = append(t.header, colName)
@@ -205,14 +205,14 @@ func (t *Table) AppendCol(colName string, c Column) *Table {
 	return t
 }
 
-// Col ...
-func (t *Table) Col(j int) []interface{} {
+// Col returns the jth Column.
+func (t *Table) Col(j int) Column {
 	m, n := t.Dims()
 	if n <= j {
-		panic("index out of range")
+		panic(errRange.Error())
 	}
 
-	c := make([]interface{}, 0, m)
+	c := make(Column, 0, m)
 	for ; j < len(t.body); j += n {
 		c = append(c, t.body[j])
 	}
@@ -220,16 +220,31 @@ func (t *Table) Col(j int) []interface{} {
 	return c
 }
 
-// ColFmt ...
-func (t *Table) ColFmt(j int) Type {
+// ColBools returns the jth column with each value cast as a boolean.
+func (t *Table) ColBools(j int) []bool {
+	m, n := t.Dims()
+	if n <= j {
+		panic(errRange.Error())
+	}
+
+	c := make([]bool, 0, m)
+	for ; j < len(t.body); j += n {
+		c = append(c, t.body[j].(bool))
+	}
+
+	return c
+}
+
+// ColType returns the type of the jth column.
+func (t *Table) ColType(j int) Type {
 	return t.types[j]
 }
 
-// ColFlts ...
+// ColFlts returns the jth column with each value cast as a float.
 func (t *Table) ColFlts(j int) []float64 {
 	m, n := t.Dims()
 	if n <= j {
-		panic("index out of range")
+		panic(errRange.Error())
 	}
 
 	c := make([]float64, 0, m)
@@ -240,11 +255,11 @@ func (t *Table) ColFlts(j int) []float64 {
 	return c
 }
 
-// ColInts ...
+// ColInts returns the jth column with each value cast as an integer.
 func (t *Table) ColInts(j int) []int {
 	m, n := t.Dims()
 	if n <= j {
-		panic("index out of range")
+		panic(errRange.Error())
 	}
 
 	c := make([]int, 0, m)
@@ -255,11 +270,11 @@ func (t *Table) ColInts(j int) []int {
 	return c
 }
 
-// ColStrs ...
+// ColStrs returns the jth column with each value cast as a string.
 func (t *Table) ColStrs(j int) []string {
 	m, n := t.Dims()
 	if n <= j {
-		panic("index out of range")
+		panic(errRange.Error())
 	}
 
 	c := make([]string, 0, m)
@@ -270,7 +285,27 @@ func (t *Table) ColStrs(j int) []string {
 	return c
 }
 
-// Copy ...
+// ColTimes returns the jth column with each value cast as a time object.
+func (t *Table) ColTimes(j int) []time.Time {
+	m, n := t.Dims()
+	if n <= j {
+		panic(errRange.Error())
+	}
+
+	c := make([]time.Time, 0, m)
+	for ; j < len(t.body); j += n {
+		c = append(c, t.body[j].(time.Time))
+	}
+
+	return c
+}
+
+// ColTypes returns the column types.
+func (t *Table) ColTypes() Types {
+	return append(make(Types, 0, len(t.types)), t.types...)
+}
+
+// Copy a table.
 func (t *Table) Copy() *Table {
 	cpy := Table{
 		header: append(make(Header, 0, len(t.header)), t.header...),
@@ -281,7 +316,7 @@ func (t *Table) Copy() *Table {
 	return &cpy
 }
 
-// Dims ...
+// Dims returns the number of rows and the number of columns in a table body.
 func (t *Table) Dims() (int, int) {
 	m, n := len(t.body), len(t.header)
 	if 0 < n {
@@ -291,46 +326,56 @@ func (t *Table) Dims() (int, int) {
 	return m, n
 }
 
-// Equal ...
+// Equal determines if two tables are equal.
 func (t *Table) Equal(tbl *Table) bool {
 	return t.header.Equal(tbl.header) && t.types.Equal(tbl.types) && t.body.Equal(tbl.body)
 }
 
-// Get ...
+// Get the (i,j)th value.
 func (t *Table) Get(i, j int) interface{} {
 	return t.body[i*len(t.header)+j]
 }
 
-// GetFlt ...
+// GetBool the (i,j)th value as a boolean.
+func (t *Table) GetBool(i, j int) bool {
+	return t.body[i*len(t.header)+j].(bool)
+}
+
+// GetFlt the (i,j)th value as a float.
 func (t *Table) GetFlt(i, j int) float64 {
 	return t.body[i*len(t.header)+j].(float64)
 }
 
-// GetInt ...
+// GetInt the (i,j)th value as an integer.
 func (t *Table) GetInt(i, j int) int {
 	return t.body[i*len(t.header)+j].(int)
 }
 
-// GetStr ...
+// GetStr the (i,j)th value as a string.
 func (t *Table) GetStr(i, j int) string {
 	return t.body[i*len(t.header)+j].(string)
 }
 
-// Header ...
+// GetTime the (i,j)th value as a time object.
+func (t *Table) GetTime(i, j int) time.Time {
+	return t.body[i*len(t.header)+j].(time.Time)
+}
+
+// Header returns the header.
 func (t *Table) Header() Header {
 	return append(make(Header, 0, len(t.header)), t.header...)
 }
 
-// Insert ...
+// Insert a row into the ith position.
 func (t *Table) Insert(i int, r Row) *Table {
 	m, _ := t.Dims()
 	return t.Append(r).Swap(i, m)
 }
 
-// InsertCol ...
-func (t *Table) InsertCol(i int, colName string, c Column) *Table {
+// InsertCol inserts a column into the jth position.
+func (t *Table) InsertCol(j int, colName string, c Column) *Table {
 	_, n := t.Dims()
-	return t.AppendCol(colName, c).SwapCols(i, n)
+	return t.AppendCol(colName, c).SwapCols(j, n)
 }
 
 // MarshalJSON ...
@@ -401,7 +446,7 @@ func (t *Table) Rows() []Row {
 // Set ...
 func (t *Table) Set(i, j int, v interface{}) *Table {
 	if t.types[j] != Parse(v) {
-		panic("invalid type")
+		panic(errType.Error())
 	}
 
 	_, n := t.Dims()
@@ -629,11 +674,6 @@ func (t *Table) ToJSON() string {
 
 	sb.WriteString("]}")
 	return sb.String()
-}
-
-// Types ...
-func (t *Table) Types() Types {
-	return append(make(Types, 0, len(t.types)), t.types...)
 }
 
 // UnmarshalJSON ...

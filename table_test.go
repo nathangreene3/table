@@ -20,7 +20,7 @@ func TestTable(t *testing.T) {
 
 		r4 := tbl.Remove(2)
 		fmt.Println(tbl.Insert(2, NewRow(2, 0.0)).Append(r4).Set(2, 1, 2.2).String())
-		fmt.Println(tbl.Types())
+		fmt.Println(tbl.ColTypes())
 		fmt.Println(tbl.InsertCol(0, "Strings", NewCol("zero", "one", "two", "three", "four")).String())
 		fmt.Println(tbl.RemoveCol(0))
 		fmt.Println(tbl.String())
