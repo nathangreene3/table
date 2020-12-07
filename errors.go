@@ -10,6 +10,12 @@ var (
 	// value in an indexible object.
 	errRange = errors.New("index out of range")
 
+	// errTimeFmt indicates a time string failed to parse.
+	errTimeFmt = errors.New("invalid time format")
+
 	// errType indicates a type does not match another type.
 	errType = errors.New("invalid type")
+
+	// errVarCount indicates an unexpected number variadic arguments were provided.
+	errVarCount = errors.New("unexpected variadic argument provided")
 )

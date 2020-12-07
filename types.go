@@ -1,41 +1,39 @@
 package table
 
-import "time"
-
 const (
-	// Int ...
+	// Int corresponds to type int.
 	Int Type = iota + 1
 
-	// Flt ...
+	// Flt corresponds to type float64.
 	Flt
 
-	// Bool ...
+	// Bool corresponds to type bool.
 	Bool
 
-	// Time ...
+	// Time corresponds to type time.Time.
 	Time
 
-	// Str ...
+	// Str corresponds to type string.
 	Str
 )
 
-// Type ...
+// Type corresponds to a basic type.
 type Type byte
 
-// Types ...
+// Types is a list of types.
 type Types []Type
 
-// NewTypes ...
+// NewTypes returns a new list of types.
 func NewTypes(ts ...Type) Types {
 	return append(make(Types, 0, len(ts)), ts...)
 }
 
-// Copy ...
+// Copy returns a copy of a list of types.
 func (ts Types) Copy() Types {
 	return append(make(Types, 0, len(ts)), ts...)
 }
 
-// Equal ...
+// Equal determines if two lists of types are equal.
 func (ts Types) Equal(types Types) bool {
 	n := len(ts)
 	if n != len(types) {
@@ -51,8 +49,8 @@ func (ts Types) Equal(types Types) bool {
 	return true
 }
 
-// Parse ...
-func Parse(x interface{}) Type {
+// ParseType returns the type of a given value.
+func ParseType(x interface{}) Type {
 	switch x.(type) {
 	case int:
 		return Int
@@ -60,7 +58,7 @@ func Parse(x interface{}) Type {
 		return Flt
 	case bool:
 		return Bool
-	case time.Time:
+	case FTime:
 		return Time
 	case string:
 		return Str

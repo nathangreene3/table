@@ -1,19 +1,19 @@
 package table
 
-// Header ...
+// Header is a list of column names.
 type Header []string
 
-// NewHeader ...
+// NewHeader returns a new header.
 func NewHeader(ss ...string) Header {
 	return append(make(Header, 0, len(ss)), ss...)
 }
 
-// Copy ...
+// Copy returns a copy of a header.
 func (h Header) Copy() Header {
 	return append(make(Header, 0, len(h)), h...)
 }
 
-// Equal ...
+// Equal determines if two headers are equal.
 func (h Header) Equal(hdr Header) bool {
 	if len(h) != len(hdr) {
 		return false
@@ -26,4 +26,9 @@ func (h Header) Equal(hdr Header) bool {
 	}
 
 	return true
+}
+
+// Strings returns a list of strings in a header.
+func (h Header) Strings() []string {
+	return append(make([]string, 0, len(h)), h...)
 }

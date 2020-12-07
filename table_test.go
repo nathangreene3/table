@@ -2,115 +2,192 @@ package table
 
 import (
 	"encoding/csv"
-	"fmt"
 	"os"
+	"strings"
 	"testing"
 	"time"
+
+	"github.com/tidwall/sjson"
 )
 
-func TestTable(t *testing.T) {
+func TestCSV(t *testing.T) {
+	var (
+		fileName = "test.csv"
+		expLines = [][]string{
+			[]string{"Integers", "Floats", "Booleans", "Times", "Strings"},
+			[]string{"0", "0.0", "false", "0001-01-01T00:00:00Z", "zero"},
+			[]string{"1", "1.1", "false", "0001-01-01T00:00:00.000000001Z", "one"},
+			[]string{"2", "2.2", "false", "0001-01-01T00:00:00.000000002Z", "two"},
+			[]string{"3", "3.3", "true", "0001-01-01T00:00:00.000000003Z", "three"},
+			[]string{"4", "4.4", "true", "0001-01-01T00:00:00.000000004Z", "four"},
+		}
+	)
+
 	{
-		tbl := New(NewHeader("Integers", "Floats")).Append(
-			NewRow(0, 0.0),
-		).Append(
-			NewRow(-1, -1.1),
-			NewRow(4, -4.4),
-			NewRow(-3, 3.3),
+		// 1. Create a new file with csv package. This file is considered valid before table reads the file's contents.
+		os.Remove(fileName)
+		file, err := os.OpenFile(fileName, os.O_RDWR|os.O_CREATE, os.ModePerm)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		if err := csv.NewWriter(file).WriteAll(expLines[:4]); err != nil {
+			t.Fatal(err)
+		}
+
+		file.Close()
+	}
+
+	{
+		// 2. Read from an existing csv file, append several rows, then replace the file's contents.
+		file, err := os.OpenFile(fileName, os.O_RDWR, os.ModePerm)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		tbl, err := FromCSV(csv.NewReader(file))
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		tbl.Append(
+			NewRow(3, 3.3, true, NewFTime(time.Time{}.Add(3)), "three"),
+			NewRow(4, 4.4, true, NewFTime(time.Time{}.Add(4)), "four"),
 		)
 
-		r4 := tbl.Remove(2)
-		fmt.Println(tbl.Insert(2, NewRow(2, 0.0)).Append(r4).Set(2, 1, 2.2).String())
-		fmt.Println(tbl.ColTypes())
-		fmt.Println(tbl.InsertCol(0, "Strings", NewCol("zero", "one", "two", "three", "four")).String())
-		fmt.Println(tbl.RemoveCol(0))
-		fmt.Println(tbl.String())
-		fmt.Println(tbl.AppendCol("Times", NewCol(time.Time{}, time.Time{}, time.Time{}, time.Time{}, time.Time{})).String())
-	}
-
-	type test struct {
-		colNames []string
-		ints     []int
-		flts     []float64
-		bools    []bool
-		times    []time.Time
-		strs     []string
-		exp      *Table
-	}
-
-	tests := []test{
-		test{
-			colNames: []string{"Integers", "Floats", "Booleans", "Times", "Strings"},
-			ints:     []int{0, 1, 2, 3, 4},
-			flts:     []float64{0, 1, 2, 3, 4},
-			bools:    []bool{false, true, false, true, false},
-			times:    []time.Time{time.Time{}.AddDate(0, 0, 0), time.Time{}.AddDate(0, 0, 1), time.Time{}.AddDate(0, 0, 2), time.Time{}.AddDate(0, 0, 3), time.Time{}.AddDate(0, 0, 4)},
-			strs:     []string{"zero", "one", "two", "three", "four"},
-			exp: &Table{
-				header: Header{"Integers", "Floats", "Booleans", "Times", "Strings"},
-				types:  Types{1, 2, 3, 4, 5},
-				body: Body{
-					int(0), float64(0.0), false, time.Time{}.AddDate(0, 0, 0), "zero",
-					int(1), float64(1.0), true, time.Time{}.AddDate(0, 0, 1), "one",
-					int(2), float64(2.0), false, time.Time{}.AddDate(0, 0, 2), "two",
-					int(3), float64(3.0), true, time.Time{}.AddDate(0, 0, 3), "three",
-					int(4), float64(4.0), false, time.Time{}.AddDate(0, 0, 4), "four",
-				},
-			},
-		},
-	}
-
-	for _, tst := range tests {
-		rec := New(NewHeader(tst.colNames...))
-		for i := 0; i < len(tst.ints); i++ {
-			rec.Append(NewRow(tst.ints[i], tst.flts[i], tst.bools[i], tst.times[i], tst.strs[i]))
+		file.Close()
+		file, err = os.OpenFile(fileName, os.O_RDWR, os.ModePerm)
+		if err != nil {
+			t.Fatal(err)
 		}
 
-		if !tst.exp.Equal(rec) {
-			t.Errorf("\nexpected %v\nreceived %v\n", tst.exp, rec)
+		if err := tbl.ToCSV(csv.NewWriter(file)); err != nil {
+			t.Fatal(err)
+		}
+
+		file.Close()
+	}
+
+	{
+		// 3. Read table-modified csv file into new table and compare to expected table.
+		file, err := os.Open(fileName)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		tbl, err := FromCSV(csv.NewReader(file))
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		expTbl := New(
+			NewHeader("Integers", "Floats", "Booleans", "Times", "Strings"),
+			NewRow(0, 0.0, false, NewFTime(time.Time{}.Add(0)), "zero"),
+			NewRow(1, 1.1, false, NewFTime(time.Time{}.Add(1)), "one"),
+			NewRow(2, 2.2, false, NewFTime(time.Time{}.Add(2)), "two"),
+			NewRow(3, 3.3, true, NewFTime(time.Time{}.Add(3)), "three"),
+			NewRow(4, 4.4, true, NewFTime(time.Time{}.Add(4)), "four"),
+		)
+
+		if !expTbl.Equal(tbl) {
+			t.Fatalf("\nexpected: %s\nreceived: %s\n", expTbl, tbl)
+		}
+
+		file.Close()
+	}
+
+	{
+		// 4. Compare csv file with csv package.
+		file, err := os.Open(fileName)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		lines, err := csv.NewReader(file).ReadAll()
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		if len(expLines) != len(lines) {
+			t.Fatalf("\nexpected %d lines\nreceived %d lines\n", len(expLines), len(lines))
+		}
+
+		for i := 0; i < len(expLines); i++ {
+			if len(expLines[i]) != len(lines[i]) {
+				t.Fatalf("\nexpected line %d to have %d columns\nreceived %d columns\n", i, len(expLines[i]), len(lines[i]))
+			}
+
+			for j := 0; j < len(expLines[i]); j++ {
+				if !strings.EqualFold(expLines[i][j], lines[i][j]) {
+					t.Fatalf("\nexpected line %d, column %d to be %q\nreceived %q\n", i, j, expLines[i][j], lines[i][j])
+				}
+			}
+		}
+
+		file.Close()
+	}
+
+	{
+		// 5. Clean up.
+		if err := os.Remove(fileName); err != nil {
+			t.Fatal(err)
 		}
 	}
 }
 
-func TestImportExport(t *testing.T) {
-	inFile, err := os.Open("test0.csv")
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer inFile.Close()
-
-	tbl, err := FromCSV(csv.NewReader(inFile))
+func TestJSON(t *testing.T) {
+	expJSON, err := sjson.Set("", "header", []string{"Integers", "Floats", "Booleans", "Times", "Strings"})
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	tbl.Insert(1, NewRow(1, 1.1, "one", false))
-	tbl.Insert(2, NewRow(2, 2.2, "two", false))
-	tbl.Append(NewRow(4, 4.4, "four", false))
-
-	outFile, err := os.OpenFile("test1.csv", os.O_RDWR|os.O_CREATE, os.ModePerm)
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer outFile.Close()
-
-	if err := tbl.ToCSV(csv.NewWriter(outFile)); err != nil {
-		t.Fatal(err)
-	}
-
-	b, err := tbl.MarshalJSON()
+	expJSON, err = sjson.Set(expJSON, "types", []int{1, 2, 3, 4, 5})
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	t.Errorf("\n%s\n", string(b))
-	newTbl := New(nil)
-	if err := newTbl.UnmarshalJSON(b); err != nil {
+	expBody := []interface{}{
+		0, 0.0, false, "0001-01-01T00:00:00Z", "zero",
+		1, 1.1, false, "0001-01-01T00:00:00.000000001Z", "one",
+		2, 2.2, false, "0001-01-01T00:00:00.000000002Z", "two",
+	}
+
+	expJSON, err = sjson.Set(expJSON, "body", expBody)
+	if err != nil {
 		t.Fatal(err)
 	}
 
-	t.Errorf("\n%s\n", newTbl.String())
-}
+	tbl := FromJSON(expJSON).Append(
+		NewRow(3, 3.3, true, NewFTime(time.Time{}.Add(3)), "three"),
+		NewRow(4, 4.4, true, NewFTime(time.Time{}.Add(4)), "four"),
+	)
 
-func BenchmarkJSON(b *testing.B) {
+	expTbl := New(
+		NewHeader("Integers", "Floats", "Booleans", "Times", "Strings"),
+		NewRow(0, 0.0, false, NewFTime(time.Time{}.Add(0)), "zero"),
+		NewRow(1, 1.1, false, NewFTime(time.Time{}.Add(1)), "one"),
+		NewRow(2, 2.2, false, NewFTime(time.Time{}.Add(2)), "two"),
+		NewRow(3, 3.3, true, NewFTime(time.Time{}.Add(3)), "three"),
+		NewRow(4, 4.4, true, NewFTime(time.Time{}.Add(4)), "four"),
+	)
 
+	if !expTbl.Equal(tbl) {
+		t.Fatalf("\nexpected: %s\nreceived: %s\n", expTbl, tbl)
+	}
+
+	expBody = append(
+		expBody,
+		3, 3.3, true, "0001-01-01T00:00:00.000000003Z", "three",
+		4, 4.4, true, "0001-01-01T00:00:00.000000004Z", "four",
+	)
+
+	expJSON, err = sjson.Set(expJSON, "body", expBody)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	outJSON := tbl.ToJSON()
+	if !strings.EqualFold(expJSON, outJSON) {
+		t.Fatalf("\nexpected %q\nreceived %q\n", expJSON, outJSON)
+	}
 }

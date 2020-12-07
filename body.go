@@ -1,9 +1,6 @@
 package table
 
-import (
-	"strconv"
-	"time"
-)
+import "strconv"
 
 // Body ...
 type Body []interface{}
@@ -37,15 +34,19 @@ func (b Body) Equal(bdy Body) bool {
 func (b Body) Strings() []string {
 	ss := make([]string, 0, len(b))
 	for i := 0; i < len(b); i++ {
-		switch Parse(b[i]) {
+		switch ParseType(b[i]) {
 		case Int:
 			ss = append(ss, strconv.Itoa(b[i].(int)))
 		case Flt:
-			ss = append(ss, strconv.FormatFloat(b[i].(float64), 'f', -1, 64))
+			if v := b[i].(float64); v == float64(int(v)) {
+				ss = append(ss, strconv.FormatFloat(v, 'f', 1, 64)) // Forces f.0 when value is an integer
+			} else {
+				ss = append(ss, strconv.FormatFloat(v, 'f', -1, 64))
+			}
 		case Bool:
 			ss = append(ss, strconv.FormatBool(b[i].(bool)))
 		case Time:
-			ss = append(ss, b[i].(time.Time).Format(time.RFC3339Nano))
+			ss = append(ss, b[i].(FTime).String())
 		case Str:
 			ss = append(ss, b[i].(string))
 		default:
@@ -60,7 +61,7 @@ func (b Body) Strings() []string {
 func (b Body) Types() Types {
 	ts := make(Types, 0, len(b))
 	for i := 0; i < len(b); i++ {
-		ts = append(ts, Parse(b[i]))
+		ts = append(ts, ParseType(b[i]))
 	}
 
 	return ts

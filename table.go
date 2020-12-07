@@ -61,8 +61,8 @@ func FromCSV(r *csv.Reader) (*Table, error) {
 				continue
 			}
 
-			if t, err := time.Parse(time.RFC3339Nano, lines[i][j]); err == nil {
-				r = append(r, t)
+			if ft, err := ParseFTime(lines[i][j]); err == nil {
+				r = append(r, ft)
 				continue
 			}
 
@@ -81,43 +81,41 @@ func FromCSV(r *csv.Reader) (*Table, error) {
 func FromJSON(s string) *Table {
 	var (
 		headerResults = gjson.Get(s, "header").Array()
-		h             = make(Header, 0, len(headerResults))
+		n             = len(headerResults)
+		h             = make(Header, 0, n)
 	)
 
-	for i := 0; i < len(headerResults); i++ {
+	for i := 0; i < n; i++ {
 		h = append(h, headerResults[i].String())
 	}
 
-	var (
-		t           = New(h)
-		bodyResults = gjson.Get(s, "body").Array()
-	)
-
-	if 0 < len(bodyResults) {
+	t := New(h)
+	if 0 < n {
 		var (
 			typeResults = gjson.Get(s, "types").Array()
-			r           = make(Row, len(headerResults))
+			bodyResults = gjson.Get(s, "body").Array()
+			mn          = len(bodyResults)
 		)
 
-		for i := 0; i < len(bodyResults); i++ {
-			rowResults := bodyResults[i].Array()
-			for j := 0; j < len(headerResults); j++ {
+		for i := 0; i < mn; i += n {
+			r := make(Row, 0, n)
+			for j := 0; j < n; j++ {
 				switch Type(typeResults[j].Int()) {
 				case Int:
-					r[j] = int(rowResults[j].Int())
+					r = append(r, int(bodyResults[i+j].Int()))
 				case Flt:
-					r[j] = float64(rowResults[j].Float())
+					r = append(r, float64(bodyResults[i+j].Float()))
 				case Bool:
-					r[j] = bool(rowResults[j].Bool())
+					r = append(r, bool(bodyResults[i+j].Bool()))
 				case Time:
-					d, err := time.Parse(time.RFC3339Nano, rowResults[j].String())
+					ft, err := ParseFTime(bodyResults[i+j].String())
 					if err != nil {
 						panic(err.Error())
 					}
 
-					r[j] = d
+					r = append(r, ft)
 				case Str:
-					r[j] = rowResults[j].String()
+					r = append(r, bodyResults[i+j].String())
 				default:
 					panic(errType.Error())
 				}
@@ -144,7 +142,7 @@ func (t *Table) Append(r ...Row) *Table {
 			}
 
 			for j := 0; j < len(r[0]); j++ {
-				switch tp := Parse(r[0][j]); tp {
+				switch tp := ParseType(r[0][j]); tp {
 				case Int, Flt, Bool, Time, Str:
 					t.types = append(t.types, tp)
 					t.body = append(t.body, r[0][j])
@@ -162,7 +160,7 @@ func (t *Table) Append(r ...Row) *Table {
 			}
 
 			for j := 0; j < len(r[i]); j++ {
-				if t.types[j] != Parse(r[i][j]) {
+				if t.types[j] != ParseType(r[i][j]) {
 					panic(errType.Error())
 				}
 
@@ -183,7 +181,7 @@ func (t *Table) AppendCol(colName string, c Column) *Table {
 
 	t.header = append(t.header, colName)
 	if 0 < m {
-		t.types = append(t.types, Parse(c[0]))
+		t.types = append(t.types, ParseType(c[0]))
 		if m+len(t.body) <= cap(t.body) {
 			t.body = append(t.body, make([]interface{}, m)...)
 			for i := m - 1; 0 < i; i-- {
@@ -194,8 +192,8 @@ func (t *Table) AppendCol(colName string, c Column) *Table {
 			t.body[n] = c[0]
 		} else {
 			b := make(Body, 0, (m+1)*n)
-			for i := 0; i < m; i++ {
-				b = append(append(b, t.body[i*n:(i+1)*n]...), c[i])
+			for i, mn := 0, m*n; i < mn; i += n {
+				b = append(append(b, t.body[i:i+n]...), c[i])
 			}
 
 			t.body = b
@@ -294,7 +292,7 @@ func (t *Table) ColTimes(j int) []time.Time {
 
 	c := make([]time.Time, 0, m)
 	for ; j < len(t.body); j += n {
-		c = append(c, t.body[j].(time.Time))
+		c = append(c, t.body[j].(FTime).time)
 	}
 
 	return c
@@ -358,7 +356,7 @@ func (t *Table) GetStr(i, j int) string {
 
 // GetTime the (i,j)th value as a time object.
 func (t *Table) GetTime(i, j int) time.Time {
-	return t.body[i*len(t.header)+j].(time.Time)
+	return t.body[i*len(t.header)+j].(FTime).time
 }
 
 // Header returns the header.
@@ -376,6 +374,28 @@ func (t *Table) Insert(i int, r Row) *Table {
 func (t *Table) InsertCol(j int, colName string, c Column) *Table {
 	_, n := t.Dims()
 	return t.AppendCol(colName, c).SwapCols(j, n)
+}
+
+// Join several tables having the same number of rows into one.
+func Join(tbl ...*Table) *Table {
+	// TODO: It is expensive to repeatedly append columns
+	var t *Table
+	if 0 < len(tbl) {
+		t = tbl[0].Copy()
+		m0, _ := t.Dims()
+		for i := 1; i < len(tbl); i++ {
+			mi, ni := tbl[i].Dims()
+			if m0 != mi {
+				panic(errDims.Error())
+			}
+
+			for j := 0; j < ni; j++ {
+				t.AppendCol(tbl[i].header[j], tbl[i].Col(j))
+			}
+		}
+	}
+
+	return t
 }
 
 // MarshalJSON ...
@@ -436,8 +456,8 @@ func (t *Table) Rows() []Row {
 		rs   = make([]Row, 0, m)
 	)
 
-	for i := 0; i < m; i++ {
-		rs = append(rs, NewRow(t.body[i*n:(i+1)*n]))
+	for i, mn := 0, m*n; i < mn; i += n {
+		rs = append(rs, NewRow(t.body[i:i+n]...))
 	}
 
 	return rs
@@ -445,7 +465,7 @@ func (t *Table) Rows() []Row {
 
 // Set ...
 func (t *Table) Set(i, j int, v interface{}) *Table {
-	if t.types[j] != Parse(v) {
+	if t.types[j] != ParseType(v) {
 		panic(errType.Error())
 	}
 
@@ -531,24 +551,24 @@ func (t *Table) Strings() [][]string {
 	}
 
 	ss = append(ss, h)
-	for i := 0; i < m; i++ {
+	for i, mn := 0, m*n; i < mn; i += n {
 		r := make([]string, 0, n)
 		for j := 0; j < n; j++ {
 			switch t.types[j] {
 			case Bool:
-				r = append(r, strconv.FormatBool(t.body[i*n+j].(bool)))
+				r = append(r, strconv.FormatBool(t.body[i+j].(bool)))
 			case Flt:
-				if v := t.body[i*n+j].(float64); v == float64(int64(v)) {
-					r = append(r, strconv.FormatFloat(v, 'f', 1, 64)) // Forces f.0
+				if v := t.body[i+j].(float64); v == float64(int64(v)) {
+					r = append(r, strconv.FormatFloat(v, 'f', 1, 64)) // Forces f.0 when value is an integer
 				} else {
 					r = append(r, strconv.FormatFloat(v, 'f', -1, 64))
 				}
 			case Int:
-				r = append(r, strconv.Itoa(t.body[i*n+j].(int)))
+				r = append(r, strconv.Itoa(t.body[i+j].(int)))
 			case Time:
-				r = append(r, t.body[i*n+j].(time.Time).Format(time.RFC3339Nano))
+				r = append(r, t.body[i+j].(FTime).String())
 			case Str:
-				r = append(r, t.body[i*n+j].(string))
+				r = append(r, t.body[i+j].(string))
 			default:
 			}
 		}
@@ -592,87 +612,68 @@ func (t *Table) ToCSV(w *csv.Writer) error {
 func (t *Table) ToJSON() string {
 	m, n := t.Dims()
 	if n == 0 {
-		return "{\"header\":[],\"types\":[],\"body\":[]}"
+		return `{"header":[],"types":[],"body":[]}`
 	}
 
 	var sb strings.Builder
 	sb.Grow((m + 3) * n * 8)
-	sb.WriteString("{\"header\":[\"" + strings.Join([]string(t.header), "\",\"") + "\"],\"types\":[" + strconv.Itoa(int(t.types[0])))
+	sb.WriteString(`{"header":["` + strings.Join([]string(t.header), `","`) + `"],"types":[` + strconv.Itoa(int(t.types[0])))
 	for j := 1; j < n; j++ {
-		sb.WriteString("," + strconv.Itoa(int(t.types[j])))
+		sb.WriteString(`,` + strconv.Itoa(int(t.types[j])))
 	}
 
-	sb.WriteString("],\"body\":[")
+	sb.WriteString(`],"body":[`)
 	if 0 < m {
-		sb.WriteByte('[')
 		switch t.types[0] {
 		case Int:
 			sb.WriteString(strconv.FormatInt(int64(t.body[0].(int)), 10))
 		case Flt:
-			sb.WriteString(strconv.FormatFloat(float64(t.body[0].(float64)), 'f', -1, 64))
+			sb.WriteString(strconv.FormatFloat(t.body[0].(float64), 'f', -1, 64))
 		case Bool:
-			sb.WriteString("\"" + strconv.FormatBool(t.body[0].(bool)) + "\"")
+			sb.WriteString(strconv.FormatBool(t.body[0].(bool)))
 		case Time:
-			sb.WriteString(",\"" + t.body[0].(time.Time).Format(time.RFC3339Nano) + "\"")
+			sb.WriteString(`"` + t.body[0].(FTime).String() + `"`)
 		case Str:
-			sb.WriteString("\"" + t.body[0].(string) + "\"")
+			sb.WriteString(`"` + t.body[0].(string) + `"`)
 		default:
 		}
 
 		for j := 1; j < n; j++ {
 			switch t.types[j] {
 			case Int:
-				sb.WriteString("," + strconv.FormatInt(int64(t.body[j].(int)), 10))
+				sb.WriteString(`,` + strconv.FormatInt(int64(t.body[j].(int)), 10))
 			case Flt:
-				sb.WriteString("," + strconv.FormatFloat(t.body[j].(float64), 'f', -1, 64))
+				sb.WriteString(`,` + strconv.FormatFloat(t.body[j].(float64), 'f', -1, 64))
 			case Bool:
-				sb.WriteString(",\"" + strconv.FormatBool(t.body[j].(bool)) + "\"")
+				sb.WriteString(`,` + strconv.FormatBool(t.body[j].(bool)))
 			case Time:
-				sb.WriteString(",\"" + t.body[j].(time.Time).String() + "\"")
+				sb.WriteString(`,"` + t.body[j].(FTime).String() + `"`)
 			case Str:
-				sb.WriteString(",\"" + t.body[j].(string) + "\"")
+				sb.WriteString(`,"` + t.body[j].(string) + `"`)
 			default:
 			}
 		}
 
-		sb.WriteByte(']')
-		for i := 1; i < m; i++ {
-			sb.WriteString(",[")
-			switch t.types[0] {
-			case Int:
-				sb.WriteString(strconv.FormatInt(int64(t.body[i*n].(int)), 10))
-			case Flt:
-				sb.WriteString(strconv.FormatFloat(t.body[i*n].(float64), 'f', -1, 64))
-			case Bool:
-				sb.WriteString("\"" + strconv.FormatBool(t.body[i*n].(bool)) + "\"")
-			case Time:
-				sb.WriteString(",\"" + t.body[i*n].(time.Time).String() + "\"")
-			case Str:
-				sb.WriteString("\"" + t.body[i*n].(string) + "\"")
-			default:
-			}
-
-			for j := 1; j < n; j++ {
+		for i, mn := n, m*n; i < mn; i += n {
+			for j := 0; j < n; j++ {
 				switch t.types[j] {
 				case Int:
-					sb.WriteString("," + strconv.FormatInt(int64(t.body[i*n+j].(int)), 10))
+					sb.WriteString(`,` + strconv.FormatInt(int64(t.body[i+j].(int)), 10))
 				case Flt:
-					sb.WriteString("," + strconv.FormatFloat(t.body[i*n+j].(float64), 'f', -1, 64))
+					sb.WriteString(`,` + strconv.FormatFloat(t.body[i+j].(float64), 'f', -1, 64))
 				case Bool:
-					sb.WriteString(",\"" + strconv.FormatBool(t.body[i*n+j].(bool)) + "\"")
+					sb.WriteString(`,` + strconv.FormatBool(t.body[i+j].(bool)))
 				case Time:
-					sb.WriteString(",\"" + t.body[i*n+j].(time.Time).String() + "\"")
+					sb.WriteString(`,"` + t.body[i+j].(FTime).String() + `"`)
 				case Str:
-					sb.WriteString(",\"" + t.body[i*n+j].(string) + "\"")
+					sb.WriteString(`,"` + t.body[i+j].(string) + `"`)
 				default:
 				}
 			}
-
-			sb.WriteString("]")
 		}
 	}
 
-	sb.WriteString("]}")
+	sb.WriteString(`]}`)
 	return sb.String()
 }
 
