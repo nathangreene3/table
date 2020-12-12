@@ -2,20 +2,20 @@ package table
 
 import "strconv"
 
-// Body ...
+// Body is a list of mn values.
 type Body []interface{}
 
-// NewBody ...
+// NewBody returns a new body of values.
 func NewBody(values ...interface{}) Body {
 	return append(make(Body, 0, len(values)), values...)
 }
 
-// Copy ...
+// Copy returns a copy of a body.
 func (b Body) Copy() Body {
 	return append(make(Body, 0, len(b)), b...)
 }
 
-// Equal ...
+// Equal determines if two bodies are equal.
 func (b Body) Equal(bdy Body) bool {
 	if len(b) != len(bdy) {
 		return false
@@ -30,7 +30,7 @@ func (b Body) Equal(bdy Body) bool {
 	return true
 }
 
-// Strings ...
+// Strings returns a list of strings in which each string is the string value converted to string by parsing the type. If a value does not parse, the empty string will be inserted.
 func (b Body) Strings() []string {
 	ss := make([]string, 0, len(b))
 	for i := 0; i < len(b); i++ {
@@ -57,7 +57,7 @@ func (b Body) Strings() []string {
 	return ss
 }
 
-// Types ...
+// Types returns a list of types of each value.
 func (b Body) Types() Types {
 	ts := make(Types, 0, len(b))
 	for i := 0; i < len(b); i++ {

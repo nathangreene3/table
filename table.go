@@ -398,12 +398,12 @@ func Join(tbl ...*Table) *Table {
 	return t
 }
 
-// MarshalJSON ...
+// MarshalJSON returns a list of json-encoded bytes. This implements the json.Marshaller interface.
 func (t *Table) MarshalJSON() ([]byte, error) {
 	return []byte(t.ToJSON()), nil
 }
 
-// Remove ...
+// Remove removes and returns the ith row from a table.
 func (t *Table) Remove(i int) Row {
 	var (
 		_, n = t.Dims()
@@ -418,7 +418,7 @@ func (t *Table) Remove(i int) Row {
 	return r
 }
 
-// RemoveCol ...
+// RemoveCol removes and returns the jth column from a table.
 func (t *Table) RemoveCol(j int) (string, Column) {
 	var (
 		m, n   = t.Dims()
@@ -443,13 +443,13 @@ func (t *Table) RemoveCol(j int) (string, Column) {
 	return name, column
 }
 
-// Row ...
+// Row returns the ith row from a table.
 func (t *Table) Row(i int) Row {
 	_, n := t.Dims()
 	return NewRow(t.body[i*n : (i+1)*n]...)
 }
 
-// Rows ...
+// Rows returns a list of all the rows in a table.
 func (t *Table) Rows() []Row {
 	var (
 		m, n = t.Dims()
@@ -463,7 +463,7 @@ func (t *Table) Rows() []Row {
 	return rs
 }
 
-// Set ...
+// Set the (i,j)th value in a table.
 func (t *Table) Set(i, j int, v interface{}) *Table {
 	if t.types[j] != ParseType(v) {
 		panic(errType.Error())
@@ -474,13 +474,13 @@ func (t *Table) Set(i, j int, v interface{}) *Table {
 	return t
 }
 
-// Sort ...
+// Sort sorts a table on the jth column. TODO
 func (t *Table) Sort(j int) *Table {
 	// TODO
 	return t
 }
 
-// String ...
+// String returns a string representing a table.
 func (t *Table) String() string {
 	var (
 		n  = len(t.header)
@@ -538,7 +538,7 @@ func (t *Table) String() string {
 	return sb.String()
 }
 
-// Strings ...
+// Strings returns a list of string lists. The first string list is the header.
 func (t *Table) Strings() [][]string {
 	var (
 		m, n = t.Dims()
@@ -579,7 +579,7 @@ func (t *Table) Strings() [][]string {
 	return ss
 }
 
-// Swap ...
+// Swap swaps two rows in a table.
 func (t *Table) Swap(i, j int) *Table {
 	_, n := t.Dims()
 	for k := 0; k < n; k++ {
@@ -590,7 +590,7 @@ func (t *Table) Swap(i, j int) *Table {
 	return t
 }
 
-// SwapCols ...
+// SwapCols swaps two columns in a table.
 func (t *Table) SwapCols(i, j int) *Table {
 	t.header[i], t.header[j] = t.header[j], t.header[i]
 	t.types[i], t.types[j] = t.types[j], t.types[i]
@@ -603,12 +603,12 @@ func (t *Table) SwapCols(i, j int) *Table {
 	return t
 }
 
-// ToCSV ...
+// ToCSV writes a table to a csv writer.
 func (t *Table) ToCSV(w *csv.Writer) error {
 	return w.WriteAll(t.Strings())
 }
 
-// ToJSON ...
+// ToJSON returns a json-encoded string representing a table.
 func (t *Table) ToJSON() string {
 	m, n := t.Dims()
 	if n == 0 {
@@ -677,7 +677,7 @@ func (t *Table) ToJSON() string {
 	return sb.String()
 }
 
-// UnmarshalJSON ...
+// UnmarshalJSON reads a list of json-encoded bytes into a table. Implements the json.Unmarshaller interface.
 func (t *Table) UnmarshalJSON(b []byte) error {
 	if t1 := FromJSON(string(b)); t1 != nil {
 		*t = *t1
