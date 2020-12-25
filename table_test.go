@@ -137,6 +137,24 @@ func TestCSV(t *testing.T) {
 	}
 }
 
+func TestFilter(t *testing.T) {
+	{
+		// Evens
+		var (
+			hdr              = NewHeader("n", "even")
+			recGen Generator = func(i int) Row { return Row{i, i%2 == 0} }
+			expGen Generator = func(i int) Row { i <<= 1; return Row{i, i%2 == 0} }
+			fltr   Filterer  = func(r Row) bool { return r[0].(int)%2 == 0 }
+			rec              = Gen(hdr, 5, recGen).Filter(fltr)
+			exp              = Gen(hdr, 3, expGen)
+		)
+
+		if !exp.Equal(rec) {
+			t.Fatalf("\nexpected %s\nreceived %s\n", exp, rec)
+		}
+	}
+}
+
 func TestJSON(t *testing.T) {
 	expJSON, err := sjson.Set("", "header", []string{"Integers", "Floats", "Booleans", "Times", "Strings"})
 	if err != nil {
@@ -191,5 +209,40 @@ func TestJSON(t *testing.T) {
 	outJSON := tbl.ToJSON()
 	if !strings.EqualFold(expJSON, outJSON) {
 		t.Fatalf("\nexpected %q\nreceived %q\n", expJSON, outJSON)
+	}
+}
+
+func TestMap(t *testing.T) {
+	{
+		// Evens
+		var (
+			hdr              = NewHeader("n", "is even")
+			recGen Generator = func(i int) Row { return Row{i, i%2 == 0} }
+			expGen Generator = func(i int) Row { i <<= 1; return Row{i, i%2 == 0} }
+			mpr    Mapper    = func(r Row) { r[0] = r[0].(int) << 1; r[1] = r[0].(int)%2 == 0 }
+			rec              = Gen(hdr, 5, recGen).Map(mpr)
+			exp              = Gen(hdr, 5, expGen)
+		)
+
+		if !exp.Equal(rec) {
+			t.Fatalf("\nexpected %s\nreceived %s\n", exp, rec)
+		}
+	}
+}
+
+func TestReduce(t *testing.T) {
+	{
+		// Sum
+		var (
+			hdr              = NewHeader("n")
+			recGen Generator = func(i int) Row { return Row{i} }
+			rdcr   Reducer   = func(dst, src Row) { dst[0] = dst[0].(int) + src[0].(int) }
+			rec              = Gen(hdr, 5, recGen).Reduce(rdcr)
+			exp              = NewRow(10)
+		)
+
+		if !exp.Equal(rec) {
+			t.Fatalf("\nexpected %s\nreceived %s\n", exp, rec)
+		}
 	}
 }

@@ -1,5 +1,7 @@
 package table
 
+// TODO: Add complex number support.
+
 const (
 	// Int corresponds to type int.
 	Int Type = iota + 1
