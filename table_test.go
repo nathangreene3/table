@@ -16,12 +16,12 @@ func TestCSV(t *testing.T) {
 	var (
 		fileName = "test.csv"
 		expLines = [][]string{
-			[]string{"Integers", "Floats", "Booleans", "Times", "Strings"},
-			[]string{"0", "0.0", "false", "0001-01-01T00:00:00Z", "zero"},
-			[]string{"1", "1.1", "false", "0001-01-01T00:00:00.000000001Z", "one"},
-			[]string{"2", "2.2", "false", "0001-01-01T00:00:00.000000002Z", "two"},
-			[]string{"3", "3.3", "true", "0001-01-01T00:00:00.000000003Z", "three"},
-			[]string{"4", "4.4", "true", "0001-01-01T00:00:00.000000004Z", "four"},
+			{"Integers", "Floats", "Booleans", "Times", "Strings"},
+			{"0", "0.0", "false", "0001-01-01T00:00:00Z", "zero"},
+			{"1", "1.1", "false", "0001-01-01T00:00:00.000000001Z", "one"},
+			{"2", "2.2", "false", "0001-01-01T00:00:00.000000002Z", "two"},
+			{"3", "3.3", "true", "0001-01-01T00:00:00.000000003Z", "three"},
+			{"4", "4.4", "true", "0001-01-01T00:00:00.000000004Z", "four"},
 		}
 	)
 
