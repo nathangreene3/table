@@ -1,7 +1,9 @@
 package table
 
 import (
+	"bytes"
 	"encoding/csv"
+	"encoding/json"
 	"os"
 	"strings"
 	"testing"
@@ -155,6 +157,10 @@ func TestFilter(t *testing.T) {
 	}
 }
 
+func TestJoin(t *testing.T) {
+	// TODO
+}
+
 func TestJSON(t *testing.T) {
 	expJSON, err := sjson.Set("", "header", []string{"Integers", "Floats", "Booleans", "Times", "Strings"})
 	if err != nil {
@@ -177,7 +183,12 @@ func TestJSON(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	tbl := FromJSON(expJSON).Append(
+	tbl, err := FromJSON(expJSON)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	tbl.Append(
 		NewRow(3, 3.3, true, NewFTime(time.Time{}.Add(3)), "three"),
 		NewRow(4, 4.4, true, NewFTime(time.Time{}.Add(4)), "four"),
 	)
@@ -209,6 +220,32 @@ func TestJSON(t *testing.T) {
 	outJSON := tbl.ToJSON()
 	if !strings.EqualFold(expJSON, outJSON) {
 		t.Fatalf("\nexpected %q\nreceived %q\n", expJSON, outJSON)
+	}
+
+	{
+		// Default json interface implementations
+		expBts, err := json.Marshal(expTbl)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		tbl := New(nil)
+		if err := json.Unmarshal(expBts, tbl); err != nil {
+			t.Fatal(err)
+		}
+
+		if !tbl.Equal(expTbl) {
+			t.Fatal()
+		}
+
+		recBts, err := json.Marshal(tbl)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		if !bytes.Equal(expBts, recBts) {
+			t.Errorf("\nexpected %q\nreceived %q\n", string(expBts), string(recBts))
+		}
 	}
 }
 
