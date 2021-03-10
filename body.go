@@ -1,6 +1,9 @@
 package table
 
-import "strconv"
+import (
+	"strconv"
+	"strings"
+)
 
 // Body is a list of mn values.
 type Body []interface{}
@@ -30,6 +33,41 @@ func (b Body) Equal(bdy Body) bool {
 	return true
 }
 
+// String returns a body formatted as [ v0 v1 ... ]
+func (b Body) String() string {
+	var sb strings.Builder
+	if 0 < len(b) {
+		sb.Grow(256)
+		sb.WriteByte('[')
+		for i := 0; i < len(b); i++ {
+			switch ParseType(b[i]) {
+			case Int:
+				sb.WriteString(" " + strconv.Itoa(b[i].(int)))
+			case Flt:
+				if v := b[i].(float64); v == float64(int(v)) {
+					sb.WriteString(" " + strconv.FormatFloat(v, 'f', 1, 64)) // Forces f.0 when value is an integer
+				} else {
+					sb.WriteString(" " + strconv.FormatFloat(v, 'f', -1, 64))
+				}
+			case Bool:
+				sb.WriteString(" " + strconv.FormatBool(b[i].(bool)))
+			case Time:
+				sb.WriteString(" " + b[i].(FTime).String())
+			case Str:
+				sb.WriteString(" " + b[i].(string))
+			default:
+				panic(errType.Error())
+			}
+		}
+
+		sb.WriteString(" ]")
+	} else {
+		sb.WriteString("[]")
+	}
+
+	return sb.String()
+}
+
 // Strings returns a list of strings in which each string is the string value converted to string by parsing the type. If a value does not parse, the empty string will be inserted.
 func (b Body) Strings() []string {
 	ss := make([]string, 0, len(b))
@@ -50,7 +88,7 @@ func (b Body) Strings() []string {
 		case Str:
 			ss = append(ss, b[i].(string))
 		default:
-			ss = append(ss, "")
+			panic(errType.Error())
 		}
 	}
 

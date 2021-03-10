@@ -1,7 +1,10 @@
 package table
 
 import (
+	"bytes"
 	"encoding/csv"
+	"io/ioutil"
+	"os"
 	"strconv"
 	"strings"
 	"time"
@@ -45,9 +48,14 @@ func New(h Header, r ...Row) *Table {
 	return t.Append(r...)
 }
 
-// FromCSV returns a new table with data read from a csv reader.
-func FromCSV(r *csv.Reader) (*Table, error) {
-	lines, err := r.ReadAll()
+// FromCSV returns a new table with data read from a csv file.
+func FromCSV(fileName string) (*Table, error) {
+	b, err := ioutil.ReadFile(fileName)
+	if err != nil {
+		return nil, err
+	}
+
+	lines, err := csv.NewReader(bytes.NewReader(b)).ReadAll()
 	if err != nil {
 		return nil, err
 	}
@@ -207,15 +215,18 @@ func (t *Table) AppendCol(colName string, c Column) *Table {
 		if m+len(t.body) <= cap(t.body) {
 			t.body = append(t.body, make([]interface{}, m)...)
 			for i := m - 1; 0 < i; i-- {
-				t.body[i*n+i+n] = c[i]
-				copy(t.body[i*n+i:i*n+i+n], t.body[i*n:i*n+n])
+				j0 := i * n
+				j1 := j0 + i
+				j2 := j1 + n
+				t.body[j2] = c[i]
+				copy(t.body[j1:j2], t.body[j0:j0+n])
 			}
 
 			t.body[n] = c[0]
 		} else {
 			b := make(Body, 0, (m+1)*n)
-			for i, mn := 0, m*n; i < mn; i += n {
-				b = append(append(b, t.body[i:i+n]...), c[i])
+			for i := 0; i < m; i++ {
+				b = append(append(b, t.body[i*n:(i+1)*n]...), c[i])
 			}
 
 			t.body = b
@@ -367,6 +378,125 @@ func (t *Table) Filter(f Filterer) *Table {
 	return t
 }
 
+// Format returns a formatted table given format rules.
+func (t *Table) Format(f format) string {
+	var (
+		m, n = t.Dims()
+		mn   = m * n
+		ws   = make([]int, 0, n) // Column widths
+	)
+
+	for j := 0; j < n; j++ {
+		ws = append(ws, len(t.header[j]))
+	}
+
+	b := t.body.Strings()
+	for i := 0; i < mn; i += n {
+		for j := 0; j < n; j++ {
+			if w := len(b[i+j]); ws[j] < w {
+				ws[j] = w
+			}
+		}
+	}
+
+	var sb strings.Builder
+	sb.Grow(256) // TODO: Estimate how big a table may be
+	sb.WriteByte('\n')
+	if 0 < len(f.upperHoriz) {
+		sb.WriteString(f.upperLeftHorizDelim)
+		if 0 < n {
+			sb.WriteString(strings.Repeat(f.upperHoriz, ws[0]+2))
+		}
+
+		for j := 1; j < n; j++ {
+			sb.WriteString(f.upperMidHorizDelim + strings.Repeat(f.upperHoriz, ws[j]+2))
+		}
+
+		sb.WriteString(f.upperRightHorizDelim + "\n")
+	}
+
+	if 0 < len(f.headerLeftDelim) {
+		sb.WriteString(f.headerLeftDelim)
+	}
+
+	if 0 < n {
+		switch t.types[0] {
+		case Flt, Int:
+			sb.WriteString(strings.Repeat(" ", ws[0]-len(t.header[0])+1) + t.header[0] + " ")
+		case Bool, Time, Str:
+			sb.WriteString(" " + t.header[0] + strings.Repeat(" ", ws[0]-len(t.header[0])+1))
+		default:
+			panic(errType.Error())
+		}
+	}
+
+	for j := 1; j < n; j++ {
+		switch t.types[j] {
+		case Flt, Int:
+			sb.WriteString(f.headerMidDelim + strings.Repeat(" ", ws[j]-len(t.header[j])+1) + t.header[j] + " ")
+		case Bool, Time, Str:
+			sb.WriteString(f.headerMidDelim + " " + t.header[j] + strings.Repeat(" ", ws[j]-len(t.header[j])+1))
+		default:
+			panic(errType.Error())
+		}
+	}
+
+	sb.WriteString(f.headerRightDelim + "\n")
+	if 0 < len(f.middleHoriz) {
+		sb.WriteString(f.middleLeftHorizDelim)
+		if 0 < n {
+			sb.WriteString(strings.Repeat(f.middleHoriz, ws[0]+2))
+		}
+
+		for j := 1; j < n; j++ {
+			sb.WriteString(f.middleMidHorizDelim + strings.Repeat(f.middleHoriz, ws[j]+2))
+		}
+
+		sb.WriteString(f.middleRightHorizDelim + "\n")
+	}
+
+	for i := 0; i < mn; i += n {
+		switch t.types[0] {
+		case Flt, Int:
+			sb.WriteString(f.rowLeftDelim + strings.Repeat(" ", ws[0]-len(b[i])+1) + b[i] + " ")
+		case Bool, Time, Str:
+			sb.WriteString(f.rowLeftDelim + " " + b[i] + strings.Repeat(" ", ws[0]-len(b[i])+1))
+		default:
+			panic(errType.Error())
+		}
+
+		for j := 1; j < n; j++ {
+			ij := i + j
+			switch t.types[j] {
+			case Flt, Int:
+				sb.WriteString(f.rowMidDelim + strings.Repeat(" ", ws[j]-len(b[ij])+1) + b[ij] + " ")
+			case Bool, Time, Str:
+				sb.WriteString(f.rowMidDelim + " " + b[ij] + strings.Repeat(" ", ws[j]-len(b[ij])+1))
+			default:
+				panic(errType.Error())
+			}
+		}
+
+		sb.WriteString(f.rowRightDelim + "\n")
+	}
+
+	// Bottom horizontal line
+	if 0 < len(f.bottomHoriz) {
+		sb.WriteString(f.bottomLeftHorizDelim)
+		if 0 < n {
+			sb.WriteString(strings.Repeat(f.bottomHoriz, ws[0]+2))
+		}
+
+		for j := 1; j < n; j++ {
+			sb.WriteString(f.bottomMidHorizDelim + strings.Repeat(f.bottomHoriz, ws[j]+2))
+		}
+
+		sb.WriteString(f.bottomRightHorizDelim + "\n")
+	}
+
+	return sb.String()
+}
+
 // Get the (i,j)th value.
 func (t *Table) Get(i, j int) interface{} {
 	return t.body[i*len(t.header)+j]
@@ -404,7 +534,19 @@ func (t *Table) Header() Header {
 
 // Insert a row into the ith position.
 func (t *Table) Insert(i int, r Row) *Table {
-	m, _ := t.Dims()
+	m, n := t.Dims()
+	for i := 0; i < n; i++ {
+		t.body = append(t.body, nil)
+	}
+
+	var (
+		j  = i * n
+		k  = j + n
+		mn = m * n
+	)
+
+	copy(t.body[k:mn+n], t.body[j:mn])
+	copy(t.body[j:k], r)
 	return t.Append(r).Swap(i, m)
 }
 
@@ -431,6 +573,8 @@ func Join(tbl ...*Table) *Table {
 				t.AppendCol(tbl[i].header[j], tbl[i].Col(j))
 			}
 		}
+	} else {
+		t = New(NewHeader())
 	}
 
 	return t
@@ -438,37 +582,40 @@ func Join(tbl ...*Table) *Table {
 
 // Join several tables having the same number of rows into one.
 func join(tbl ...*Table) *Table {
-	if len(tbl) == 0 {
-		return nil
-	}
+	var t *Table
+	if 0 < len(tbl) {
+		m, n := tbl[0].Dims()
+		ns := append(make([]int, 0, len(tbl)), n)
+		for i := 1; i < len(tbl); i++ {
+			mi, ni := tbl[i].Dims()
+			if m != mi {
+				panic(errDims.Error())
+			}
 
-	m, n := tbl[0].Dims()
-	ns := append(make([]int, 0, len(tbl)), n)
-	for i := 1; i < len(tbl); i++ {
-		mi, ni := tbl[i].Dims()
-		if m != mi {
-			panic(errDims.Error())
+			n += ni
+			ns = append(ns, ni)
 		}
 
-		n += ni
-		ns = append(ns, ni)
-	}
-
-	h := make(Header, 0, n)
-	for i := 0; i < len(tbl); i++ {
-		h = append(h, tbl[i].header...)
-	}
-
-	f := func(i int) Row {
-		r := make(Row, 0, n)
-		for j := 0; j < len(tbl); j++ {
-			r = append(r, tbl[j].body[i*ns[j]:(i+1)*ns[j]]...)
+		h := make(Header, 0, n)
+		for i := 0; i < len(tbl); i++ {
+			h = append(h, tbl[i].header...)
 		}
 
-		return r
+		f := func(i int) Row {
+			r := make(Row, 0, n)
+			for j := 0; j < len(tbl); j++ {
+				r = append(r, tbl[j].body[i*ns[j]:(i+1)*ns[j]]...)
+			}
+
+			return r
+		}
+
+		t = Gen(h, m, f)
+	} else {
+		t = New(NewHeader())
 	}
 
-	return Gen(h, m, f)
+	return t
 }
 
 // Map mutates each row in a table.
@@ -577,66 +724,51 @@ func (t *Table) Set(i, j int, v interface{}) *Table {
 
 // Sort sorts a table on the jth column. TODO
 func (t *Table) Sort(j int) *Table {
-	// TODO
+	return t.Stable(j) // TODO: Replace
+}
+
+// Stable sorts a table on the jth column.
+func (t *Table) Stable(j int) *Table {
+	m, n := t.Dims()
+	for k := 1; k < m; k++ {
+		for i := k - 1; 0 <= i; i-- {
+			switch t.types[j] {
+			case Int:
+				if t.body[i*n+j].(int) <= t.body[(i+1)*n+j].(int) {
+					i = -1
+				}
+			case Flt:
+				if t.body[i*n+j].(float64) <= t.body[(i+1)*n+j].(float64) {
+					i = -1
+				}
+			case Bool:
+				if !t.body[i*n+j].(bool) || t.body[(i+1)*n+j].(bool) {
+					i = -1
+				}
+			case Time:
+				if t.body[i*n+j].(FTime).Compare(t.body[(i+1)*n+j].(FTime)) <= 0 {
+					i = -1
+				}
+			case Str:
+				if t.body[i*n+j].(string) <= t.body[(i+1)*n+j].(string) {
+					i = -1
+				}
+			default:
+				panic(errType.Error())
+			}
+
+			if 0 <= i {
+				t.Swap(i, i+1)
+			}
+		}
+	}
+
 	return t
 }
 
 // String returns a string representing a table.
 func (t *Table) String() string {
-	var (
-		n  = len(t.header)
-		ws = make([]int, n)
-	)
-
-	for j := 0; j < n; j++ {
-		if ws[j] < len(t.header[j]) {
-			ws[j] = len(t.header[j])
-		}
-	}
-
-	b := t.body.Strings()
-	for i := 0; i < len(b); i++ {
-		if ws[i%n] < len(b[i]) {
-			ws[i%n] = len(b[i])
-		}
-	}
-
-	hs := make([]string, 0, n)
-	for j := 0; j < n; j++ {
-		hs = append(hs, strings.Repeat("-", ws[j]+2))
-	}
-
-	h := "+" + strings.Join(hs, "+") + "+"
-
-	var sb strings.Builder
-	sb.WriteString("\n" + h + "\n|")
-	for j := 0; j < n; j++ {
-		switch t.types[j] {
-		case Flt, Int:
-			sb.WriteString(strings.Repeat(" ", ws[j]-len(t.header[j])+1) + t.header[j] + " |")
-		case Bool, Time, Str:
-			sb.WriteString(" " + t.header[j] + strings.Repeat(" ", ws[j]-len(t.header[j])+1) + "|")
-		default:
-		}
-	}
-
-	sb.WriteString("\n" + h)
-	for i := 0; i < len(b); i += n {
-		sb.WriteString("\n|")
-		for j, k := 0, i; j < n && k < len(b); j, k = j+1, k+1 {
-			switch t.types[j] {
-			case Flt, Int:
-				// Right-aligned
-				sb.WriteString(strings.Repeat(" ", ws[j]-len(b[k])+1) + b[k] + " |")
-			case Bool, Time, Str:
-				// Left-aligned
-				sb.WriteString(" " + b[k] + strings.Repeat(" ", ws[j]-len(b[k])+1) + "|")
-			}
-		}
-	}
-
-	sb.WriteString("\n" + h)
-	return sb.String()
+	return "[" + t.header.String() + " | " + t.body.String() + "]"
 }
 
 // Strings returns a list of string lists. The first string list is the header.
@@ -705,8 +837,13 @@ func (t *Table) SwapCols(i, j int) *Table {
 }
 
 // ToCSV writes a table to a csv writer.
-func (t *Table) ToCSV(w *csv.Writer) error {
-	return w.WriteAll(t.Strings())
+func (t *Table) ToCSV(fileName string) error {
+	file, err := os.OpenFile(fileName, os.O_WRONLY, os.ModePerm)
+	if err != nil {
+		return err
+	}
+
+	return csv.NewWriter(file).WriteAll(t.Strings())
 }
 
 // ToJSON returns a json-encoded string representing a table.

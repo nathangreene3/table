@@ -1,5 +1,7 @@
 package table
 
+import "strings"
+
 // Header is a list of column names.
 type Header []string
 
@@ -26,6 +28,29 @@ func (h Header) Equal(hdr Header) bool {
 	}
 
 	return true
+}
+
+// String ...
+func (h Header) String() string {
+	var sb strings.Builder
+	if 0 < len(h) {
+		n := len(h) + 3
+		for i := 0; i < len(h); i++ {
+			n += len(h[i])
+		}
+
+		sb.Grow(n)
+		sb.WriteByte('[')
+		for i := 0; i < len(h); i++ {
+			sb.WriteString(" " + h[i])
+		}
+
+		sb.WriteString(" ]")
+	} else {
+		sb.WriteString("[]")
+	}
+
+	return sb.String()
 }
 
 // Strings returns a list of strings in a header.

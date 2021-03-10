@@ -47,6 +47,23 @@ func NewFTime(t time.Time, format ...string) FTime {
 	}
 }
 
+// Compare compares two time stamps.
+func (ft FTime) Compare(ftime FTime) int {
+	var c int
+	switch {
+	case ft.time.Before(ftime.time):
+		c--
+	case ft.time.After(ftime.time):
+		c++
+	case ft.format < ftime.format:
+		c--
+	case ftime.format < ft.format:
+		c++
+	}
+
+	return c
+}
+
 // Equal determines if two FTimes are equal.
 func (ft FTime) Equal(fTime FTime) bool {
 	return ft.time.Equal(fTime.time) && ft.format == fTime.format
