@@ -4,7 +4,9 @@ import (
 	"bytes"
 	"encoding/csv"
 	"encoding/json"
+	"fmt"
 	"os"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -154,6 +156,19 @@ func TestAppendCol(t *testing.T) {
 			exp:     New(NewHeader("")),
 			colName: "",
 			col:     NewCol(),
+		},
+		{
+			tbl: New(NewHeader()),
+			exp: New(
+				NewHeader("Integers"),
+				NewRow(0),
+				NewRow(1),
+				NewRow(2),
+				NewRow(3),
+				NewRow(4),
+			),
+			colName: "Integers",
+			col:     NewCol(0, 1, 2, 3, 4),
 		},
 		{
 			tbl: New(
@@ -359,7 +374,70 @@ func TestFilter(t *testing.T) {
 }
 
 func TestGen(t *testing.T) {
-	// TODO
+	intStr := func(n int) string {
+		var s string
+		switch n {
+		case 0:
+			s = "zero"
+		case 1:
+			s = "one"
+		case 2:
+			s = "two"
+		case 3:
+			s = "three"
+		case 4:
+			s = "four"
+		case 5:
+			s = "five"
+		case 6:
+			s = "six"
+		case 7:
+			s = "seven"
+		case 8:
+			s = "eight"
+		case 9:
+			s = "nine"
+		default:
+			panic("Value not yet supported")
+		}
+
+		return s
+	}
+
+	tests := []struct {
+		h   Header
+		m   int
+		f   Generator
+		exp *Table
+	}{
+		{
+			h: NewHeader("Integers", "Floats", "Booleans", "Times", "Strings"),
+			m: 5,
+			f: func(i int) Row {
+				s := strconv.Itoa(i)
+				f, err := strconv.ParseFloat(s+"."+s, 64)
+				if err != nil {
+					panic(err)
+				}
+
+				return NewRow(i, f, 2 < i, NewFTime(time.Time{}.Add(time.Duration(i))), intStr(i))
+			},
+			exp: New(
+				NewHeader("Integers", "Floats", "Booleans", "Times", "Strings"),
+				NewRow(0, 0.0, false, NewFTime(time.Time{}.Add(0)), "zero"),
+				NewRow(1, 1.1, false, NewFTime(time.Time{}.Add(1)), "one"),
+				NewRow(2, 2.2, false, NewFTime(time.Time{}.Add(2)), "two"),
+				NewRow(3, 3.3, true, NewFTime(time.Time{}.Add(3)), "three"),
+				NewRow(4, 4.4, true, NewFTime(time.Time{}.Add(4)), "four"),
+			),
+		},
+	}
+
+	for _, test := range tests {
+		if rec := Gen(test.h, test.m, test.f); !test.exp.Equal(rec) {
+			t.Errorf("\nexpected:\n%v\nreceived:\n%v\n", test.exp, rec)
+		}
+	}
 }
 
 func TestJoin(t *testing.T) {
@@ -492,6 +570,10 @@ func TestJoin(t *testing.T) {
 
 		if rec := join(test.tbl...); !test.exp.Equal(rec) {
 			t.Errorf("\nTest %d: join\nexpected: \n%s\nreceived: \n%s\n", i, test.exp, rec)
+		}
+
+		if rec := join2(test.tbl...); !test.exp.Equal(rec) {
+			t.Errorf("\nTest %d: join2\nexpected: \n%s\nreceived: \n%s\n", i, test.exp, rec)
 		}
 	}
 }
@@ -727,4 +809,93 @@ func TestStable(t *testing.T) {
 			t.Errorf("\n   given: col = %d\nexpected:\n%v\nreceived:\n%v\n", test.col, test.exp, rec)
 		}
 	}
+}
+
+// ------------------------------------------------------------------------------------
+// Benchmarks
+// ------------------------------------------------------------------------------------
+
+func BenchmarkJoin(b *testing.B) {
+	// Linear benchmarks
+	var (
+		m0, m1, dm = 8, 8, 1 // Number of rows
+		n0, n1, dn = 8, 8, 1 // Number of columns
+		k0, k1, dk = 8, 8, 1 // Number of tables
+	)
+
+	for n := n0; n <= n1; n += dn {
+		for m := m0; m <= m1; m += dm {
+			col := NewCol()
+			for mi := 0; mi < m; mi++ {
+				col = append(col, mi)
+			}
+
+			tbl := New(NewHeader())
+			for ni := 1; ni < n; ni++ {
+				tbl.AppendCol("Integers", col)
+			}
+
+			tbls := make([]*Table, 0, k1)
+			for k := k0; k <= k1; k += dk {
+				for ; len(tbls) < k; tbls = append(tbls, tbl.Copy()) {
+				}
+
+				benchmarkJoin(b, fmt.Sprintf("Join %d %dx%d tables", k, m, n), Join, tbls...)
+			}
+		}
+	}
+
+	for n := n0; n <= n1; n += dn {
+		for m := m0; m <= m1; m += dm {
+			col := NewCol()
+			for mi := 0; mi < m; mi++ {
+				col = append(col, mi)
+			}
+
+			tbl := New(NewHeader())
+			for ni := 1; ni < n; ni++ {
+				tbl.AppendCol("Integers", col)
+			}
+
+			tbls := make([]*Table, 0, k1)
+			for k := k0; k <= k1; k += dk {
+				for ; len(tbls) < k; tbls = append(tbls, tbl.Copy()) {
+				}
+
+				benchmarkJoin(b, fmt.Sprintf("join %d %dx%d tables", k, m, n), join, tbls...)
+			}
+		}
+	}
+
+	for n := n0; n <= n1; n += dn {
+		for m := m0; m <= m1; m += dm {
+			col := NewCol()
+			for mi := 0; mi < m; mi++ {
+				col = append(col, mi)
+			}
+
+			tbl := New(NewHeader())
+			for ni := 1; ni < n; ni++ {
+				tbl.AppendCol("Integers", col)
+			}
+
+			tbls := make([]*Table, 0, k1)
+			for k := k0; k <= k1; k += dk {
+				for ; len(tbls) < k; tbls = append(tbls, tbl.Copy()) {
+				}
+
+				benchmarkJoin(b, fmt.Sprintf("join2 %d %dx%d tables", k, m, n), join2, tbls...)
+			}
+		}
+	}
+}
+
+func benchmarkJoin(b *testing.B, name string, joinFn func(tbl ...*Table) *Table, tbl ...*Table) bool {
+	g := func(b *testing.B) {
+		for i := 0; i < b.N; i++ {
+			_ = joinFn(tbl...)
+		}
+	}
+
+	return b.Run(name, g)
 }
