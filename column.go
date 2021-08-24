@@ -6,8 +6,8 @@ type Column []interface{}
 // NewCol returns a new column of values.
 func NewCol(values ...interface{}) Column {
 	if 0 < len(values) {
-		for i, f := 1, ParseType(values[0]); i < len(values); i++ {
-			if f != ParseType(values[i]) {
+		for i, f := 1, Parse(values[0]); i < len(values); i++ {
+			if f != Parse(values[i]) {
 				panic("invalid format")
 			}
 		}
@@ -41,9 +41,9 @@ func (c Column) Equal(col Column) bool {
 func (c Column) Type() Type {
 	var t Type
 	if 0 < len(c) {
-		t = ParseType(c[0])
+		t = Parse(c[0])
 		for i := 1; i < len(c); i++ {
-			if ParseType(c[i]) != t {
+			if Parse(c[i]) != t {
 				t = 0
 				break
 			}

@@ -1,6 +1,6 @@
 package table
 
-// TODO: Add complex number support.
+// TODO: Add support for complex numbers and money.
 
 const (
 	// Int corresponds to type int.
@@ -51,8 +51,8 @@ func (ts Types) Equal(types Types) bool {
 	return true
 }
 
-// ParseType returns the type of a given value.
-func ParseType(x interface{}) Type {
+// Parse returns the type of a given value.
+func Parse(x interface{}) Type {
 	switch x.(type) {
 	case int:
 		return Int

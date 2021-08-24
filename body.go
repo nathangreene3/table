@@ -40,7 +40,7 @@ func (b Body) String() string {
 		sb.Grow(256)
 		sb.WriteByte('[')
 		for i := 0; i < len(b); i++ {
-			switch ParseType(b[i]) {
+			switch Parse(b[i]) {
 			case Int:
 				sb.WriteString(" " + strconv.Itoa(b[i].(int)))
 			case Flt:
@@ -72,7 +72,7 @@ func (b Body) String() string {
 func (b Body) Strings() []string {
 	ss := make([]string, 0, len(b))
 	for i := 0; i < len(b); i++ {
-		switch ParseType(b[i]) {
+		switch Parse(b[i]) {
 		case Int:
 			ss = append(ss, strconv.Itoa(b[i].(int)))
 		case Flt:
@@ -99,7 +99,7 @@ func (b Body) Strings() []string {
 func (b Body) Types() Types {
 	ts := make(Types, 0, len(b))
 	for i := 0; i < len(b); i++ {
-		ts = append(ts, ParseType(b[i]))
+		ts = append(ts, Parse(b[i]))
 	}
 
 	return ts

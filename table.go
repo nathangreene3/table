@@ -171,13 +171,13 @@ func Gen2(h Header, m int, f Generator2) *Table {
 	if 0 < m {
 		for j := 0; j < len(h); j++ {
 			t.body = append(t.body, f(0, j))
-			t.types = append(t.types, ParseType(t.body[j]))
+			t.types = append(t.types, Parse(t.body[j]))
 		}
 
 		for i := 1; i < m; i++ {
 			for j := 0; j < len(h); j++ {
 				t.body = append(t.body, f(i, j))
-				if ParseType(t.body[i*len(h)+j]) != t.types[j] {
+				if Parse(t.body[i*len(h)+j]) != t.types[j] {
 					panic(errType.Error())
 				}
 			}
@@ -201,7 +201,7 @@ func (t *Table) Append(r ...Row) *Table {
 			}
 
 			for j := 0; j < len(r[0]); j++ {
-				switch tp := ParseType(r[0][j]); tp {
+				switch tp := Parse(r[0][j]); tp {
 				case Int, Flt, Bool, Time, Str:
 					t.types = append(t.types, tp)
 					t.body = append(t.body, r[0][j])
@@ -219,7 +219,7 @@ func (t *Table) Append(r ...Row) *Table {
 			}
 
 			for j := 0; j < len(r[i]); j++ {
-				if t.types[j] != ParseType(r[i][j]) {
+				if t.types[j] != Parse(r[i][j]) {
 					panic(errType.Error())
 				}
 
@@ -252,7 +252,7 @@ func (t *Table) AppendCol(colName string, c Column) *Table {
 
 	t.header = append(t.header, colName)
 	if 0 < m {
-		t.types = append(t.types, ParseType(c[0]))
+		t.types = append(t.types, Parse(c[0]))
 		if m+len(t.body) <= cap(t.body) {
 			t.body = append(t.body, make([]interface{}, m)...)
 			for i := m - 1; 0 < i; i-- {
@@ -792,7 +792,7 @@ func (t *Table) Rows() []Row {
 
 // Set the (i,j)th value in a table.
 func (t *Table) Set(i, j int, v interface{}) *Table {
-	if t.types[j] != ParseType(v) {
+	if t.types[j] != Parse(v) {
 		panic(errType.Error())
 	}
 
@@ -917,12 +917,12 @@ func (t *Table) SwapCols(i, j int) *Table {
 
 // ToCSV writes a table to a csv writer.
 func (t *Table) ToCSV(fileName string) error {
-	file, err := os.OpenFile(fileName, os.O_WRONLY, os.ModePerm)
+	f, err := os.OpenFile(fileName, os.O_WRONLY, os.ModePerm)
 	if err != nil {
 		return err
 	}
 
-	return csv.NewWriter(file).WriteAll(t.Strings())
+	return csv.NewWriter(f).WriteAll(t.Strings())
 }
 
 // ToJSON returns a json-encoded string representing a table.

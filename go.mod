@@ -1,6 +1,6 @@
 module github.com/nathangreene3/table
 
-go 1.15
+go 1.16
 
 require (
 	github.com/tidwall/gjson v1.6.8
