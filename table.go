@@ -917,7 +917,7 @@ func (t *Table) SwapCols(i, j int) *Table {
 
 // ToCSV writes a table to a csv writer.
 func (t *Table) ToCSV(fileName string) error {
-	f, err := os.OpenFile(fileName, os.O_WRONLY, os.ModePerm)
+	f, err := os.OpenFile(fileName, os.O_WRONLY|os.O_CREATE, os.ModePerm)
 	if err != nil {
 		return err
 	}
