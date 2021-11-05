@@ -35,10 +35,10 @@ func (r Row) Interfaces() []interface{} {
 
 // Types returns a list of a row's types.
 func (r Row) Types() Types {
-	f := make(Types, 0, len(r))
+	types := make(Types, 0, len(r))
 	for i := 0; i < len(r); i++ {
-		f = append(f, Parse(r[i]))
+		types = append(types, Parse(r[i]))
 	}
 
-	return f
+	return types
 }

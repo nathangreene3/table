@@ -1,6 +1,9 @@
 package table
 
-import "time"
+import (
+	"errors"
+	"time"
+)
 
 // timeFmts is a list of time formats supported in parsing a time stamp.
 var timeFmts = []string{
@@ -89,7 +92,7 @@ func ParseFTime(timeStr string, additionalTimeFmts ...string) (FTime, error) {
 		}
 	}
 
-	return FTime{}, errTimeFmt
+	return FTime{}, errors.New(errTimeFmt)
 }
 
 // String returns a timestamp formatted by the underlying

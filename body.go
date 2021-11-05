@@ -33,7 +33,7 @@ func (b Body) Equal(bdy Body) bool {
 	return true
 }
 
-// String returns a body formatted as [ v0 v1 ... ]
+// String returns a body formatted as [ v0 v1 ... ].
 func (b Body) String() string {
 	var sb strings.Builder
 	if 0 < len(b) {
@@ -56,7 +56,7 @@ func (b Body) String() string {
 			case Str:
 				sb.WriteString(" " + b[i].(string))
 			default:
-				panic(errType.Error())
+				panic(errType)
 			}
 		}
 
@@ -68,7 +68,9 @@ func (b Body) String() string {
 	return sb.String()
 }
 
-// Strings returns a list of strings in which each string is the string value converted to string by parsing the type. If a value does not parse, the empty string will be inserted.
+// Strings returns a list of strings in which each string is the string
+// value converted to string by parsing the type. If a value does not
+// parse, the empty string will be inserted.
 func (b Body) Strings() []string {
 	ss := make([]string, 0, len(b))
 	for i := 0; i < len(b); i++ {
@@ -88,7 +90,7 @@ func (b Body) Strings() []string {
 		case Str:
 			ss = append(ss, b[i].(string))
 		default:
-			panic(errType.Error())
+			panic(errType)
 		}
 	}
 

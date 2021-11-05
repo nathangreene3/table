@@ -19,11 +19,12 @@ import (
 func TestFormat(t *testing.T) {
 	tests := []struct {
 		tbl *Table
-		fmt format
+		fmt Format
 		exp string
 	}{
 		{
-			tbl: New(NewHeader("Integers", "Floats", "Booleans", "Times", "Strings"),
+			tbl: New(
+				NewHeader("Integers", "Floats", "Booleans", "Times", "Strings"),
 				NewRow(0, 0.0, false, NewFTime(time.Time{}.Add(0)), "zero"),
 				NewRow(1, 1.1, false, NewFTime(time.Time{}.Add(1)), "one"),
 				NewRow(2, 2.2, false, NewFTime(time.Time{}.Add(2)), "two"),
@@ -41,7 +42,8 @@ func TestFormat(t *testing.T) {
 				"        4     4.4  true      0001-01-01T00:00:00.000000004Z  four    \n",
 		},
 		{
-			tbl: New(NewHeader("Integers", "Floats", "Booleans", "Times", "Strings"),
+			tbl: New(
+				NewHeader("Integers", "Floats", "Booleans", "Times", "Strings"),
 				NewRow(0, 0.0, false, NewFTime(time.Time{}.Add(0)), "zero"),
 				NewRow(1, 1.1, false, NewFTime(time.Time{}.Add(1)), "one"),
 				NewRow(2, 2.2, false, NewFTime(time.Time{}.Add(2)), "two"),
@@ -60,7 +62,8 @@ func TestFormat(t *testing.T) {
 				"        4     4.4  true      0001-01-01T00:00:00.000000004Z  four    \n",
 		},
 		{
-			tbl: New(NewHeader("Integers", "Floats", "Booleans", "Times", "Strings"),
+			tbl: New(
+				NewHeader("Integers", "Floats", "Booleans", "Times", "Strings"),
 				NewRow(0, 0.0, false, NewFTime(time.Time{}.Add(0)), "zero"),
 				NewRow(1, 1.1, false, NewFTime(time.Time{}.Add(1)), "one"),
 				NewRow(2, 2.2, false, NewFTime(time.Time{}.Add(2)), "two"),
@@ -79,7 +82,8 @@ func TestFormat(t *testing.T) {
 				"---------------------------------------------------------------------\n",
 		},
 		{
-			tbl: New(NewHeader("Integers", "Floats", "Booleans", "Times", "Strings"),
+			tbl: New(
+				NewHeader("Integers", "Floats", "Booleans", "Times", "Strings"),
 				NewRow(0, 0.0, false, NewFTime(time.Time{}.Add(0)), "zero"),
 				NewRow(1, 1.1, false, NewFTime(time.Time{}.Add(1)), "one"),
 				NewRow(2, 2.2, false, NewFTime(time.Time{}.Add(2)), "two"),
@@ -99,7 +103,8 @@ func TestFormat(t *testing.T) {
 				"---------------------------------------------------------------------\n",
 		},
 		{
-			tbl: New(NewHeader("Integers", "Floats", "Booleans", "Times", "Strings"),
+			tbl: New(
+				NewHeader("Integers", "Floats", "Booleans", "Times", "Strings"),
 				NewRow(0, 0.0, false, NewFTime(time.Time{}.Add(0)), "zero"),
 				NewRow(1, 1.1, false, NewFTime(time.Time{}.Add(1)), "one"),
 				NewRow(2, 2.2, false, NewFTime(time.Time{}.Add(2)), "two"),
@@ -117,7 +122,8 @@ func TestFormat(t *testing.T) {
 				"        4      4.4   true       0001-01-01T00:00:00.000000004Z   four    \n",
 		},
 		{
-			tbl: New(NewHeader("Integers", "Floats", "Booleans", "Times", "Strings"),
+			tbl: New(
+				NewHeader("Integers", "Floats", "Booleans", "Times", "Strings"),
 				NewRow(0, 0.0, false, NewFTime(time.Time{}.Add(0)), "zero"),
 				NewRow(1, 1.1, false, NewFTime(time.Time{}.Add(1)), "one"),
 				NewRow(2, 2.2, false, NewFTime(time.Time{}.Add(2)), "two"),
@@ -233,7 +239,7 @@ func TestCSV(t *testing.T) {
 			NewRow(4, 4.4, true, NewFTime(time.Time{}.Add(4)), "four"),
 		)
 
-		if err := tbl.ToCSV(fileName); err != nil {
+		if err := tbl.WriteCSV(fileName); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -335,8 +341,8 @@ func TestFilter(t *testing.T) {
 			recGen Generator = func(i int) Row { return Row{i, i%2 == 0} }
 			expGen Generator = func(i int) Row { i <<= 1; return Row{i, i%2 == 0} }
 			fltr   Filterer  = func(r Row) bool { return r[0].(int)%2 == 0 }
-			rec              = Gen(hdr, 5, recGen).Filter(fltr)
-			exp              = Gen(hdr, 3, expGen)
+			rec              = Generate(hdr, 5, recGen).Filter(fltr)
+			exp              = Generate(hdr, 3, expGen)
 		)
 
 		if !exp.Equal(rec) {
@@ -348,7 +354,7 @@ func TestFilter(t *testing.T) {
 		// Primes
 		// var (
 		// 	hdr            = NewHeader("n")
-		// 	gen  Generator = func(i int) Row { return NewRow(i + 1) }
+		// 	gen  generator = func(i int) Row { return NewRow(i + 1) }
 		// 	fltr Filterer  = func(r Row) bool {
 		// 		n := r[0].(int)
 		// 		if n == 2 {
@@ -369,7 +375,7 @@ func TestFilter(t *testing.T) {
 		// 	}
 		// )
 
-		// t.Fatal(Gen(hdr, 100, gen).Filter(fltr))
+		// t.Fatal(gen(hdr, 100, gen).Filter(fltr))
 	}
 }
 
@@ -434,7 +440,7 @@ func TestGen(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		if rec := Gen(test.h, test.m, test.f); !test.exp.Equal(rec) {
+		if rec := Generate(test.h, test.m, test.f); !test.exp.Equal(rec) {
 			t.Errorf("\nexpected:\n%v\nreceived:\n%v\n", test.exp, rec)
 		}
 	}
@@ -568,7 +574,7 @@ func TestJoin(t *testing.T) {
 			t.Errorf("\nTest %d: Join\nexpected: \n%s\nreceived: \n%s\n", i, test.exp, rec)
 		}
 
-		if rec := join(test.tbl...); !test.exp.Equal(rec) {
+		if rec := join1(test.tbl...); !test.exp.Equal(rec) {
 			t.Errorf("\nTest %d: join\nexpected: \n%s\nreceived: \n%s\n", i, test.exp, rec)
 		}
 
@@ -634,7 +640,7 @@ func TestJSON(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	outJSON := tbl.ToJSON()
+	outJSON := tbl.JSON()
 	if !strings.EqualFold(expJSON, outJSON) {
 		t.Fatalf("\nexpected %q\nreceived %q\n", expJSON, outJSON)
 	}
@@ -674,8 +680,8 @@ func TestMap(t *testing.T) {
 			recGen Generator = func(i int) Row { return Row{i, i%2 == 0} }
 			expGen Generator = func(i int) Row { i <<= 1; return Row{i, i%2 == 0} }
 			mpr    Mapper    = func(r Row) { r[0] = r[0].(int) << 1; r[1] = r[0].(int)%2 == 0 }
-			rec              = Gen(hdr, 5, recGen).Map(mpr)
-			exp              = Gen(hdr, 5, expGen)
+			rec              = Generate(hdr, 5, recGen).Map(mpr)
+			exp              = Generate(hdr, 5, expGen)
 		)
 
 		if !exp.Equal(rec) {
@@ -692,7 +698,7 @@ func TestReduce(t *testing.T) {
 			recGen Generator = func(i int) Row { return Row{i} }
 			rdcr   Reducer   = func(dst, src Row) { dst[0] = dst[0].(int) + src[0].(int) }
 			n                = 5
-			rec              = Gen(h, n, recGen).Reduce(rdcr)
+			rec              = Generate(h, n, recGen).Reduce(rdcr)
 			exp              = NewRow(n * (n - 1) >> 1)
 		)
 
@@ -821,18 +827,19 @@ func BenchmarkJoin(b *testing.B) {
 		m0, m1, dm = 8, 8, 1 // Number of rows
 		n0, n1, dn = 8, 8, 1 // Number of columns
 		k0, k1, dk = 8, 8, 1 // Number of tables
+		s          = strings.Repeat("hello", 8)
 	)
 
 	for n := n0; n <= n1; n += dn {
 		for m := m0; m <= m1; m += dm {
 			col := NewCol()
 			for mi := 0; mi < m; mi++ {
-				col = append(col, mi)
+				col = append(col, s)
 			}
 
 			tbl := New(NewHeader())
 			for ni := 1; ni < n; ni++ {
-				tbl.AppendCol("Integers", col)
+				tbl.AppendCol("Strings", col)
 			}
 
 			tbls := make([]*Table, 0, k1)
@@ -849,12 +856,12 @@ func BenchmarkJoin(b *testing.B) {
 		for m := m0; m <= m1; m += dm {
 			col := NewCol()
 			for mi := 0; mi < m; mi++ {
-				col = append(col, mi)
+				col = append(col, s)
 			}
 
 			tbl := New(NewHeader())
 			for ni := 1; ni < n; ni++ {
-				tbl.AppendCol("Integers", col)
+				tbl.AppendCol("Strings", col)
 			}
 
 			tbls := make([]*Table, 0, k1)
@@ -862,7 +869,7 @@ func BenchmarkJoin(b *testing.B) {
 				for ; len(tbls) < k; tbls = append(tbls, tbl.Copy()) {
 				}
 
-				benchmarkJoin(b, fmt.Sprintf("join %d %dx%d tables", k, m, n), join, tbls...)
+				benchmarkJoin(b, fmt.Sprintf("join1 %d %dx%d tables", k, m, n), join1, tbls...)
 			}
 		}
 	}
@@ -871,12 +878,12 @@ func BenchmarkJoin(b *testing.B) {
 		for m := m0; m <= m1; m += dm {
 			col := NewCol()
 			for mi := 0; mi < m; mi++ {
-				col = append(col, mi)
+				col = append(col, s)
 			}
 
 			tbl := New(NewHeader())
 			for ni := 1; ni < n; ni++ {
-				tbl.AppendCol("Integers", col)
+				tbl.AppendCol("Strings", col)
 			}
 
 			tbls := make([]*Table, 0, k1)
@@ -890,11 +897,13 @@ func BenchmarkJoin(b *testing.B) {
 	}
 }
 
-func benchmarkJoin(b *testing.B, name string, joinFn func(tbl ...*Table) *Table, tbl ...*Table) bool {
+func benchmarkJoin(b *testing.B, name string, joinFn func(tbl ...*Table) *Table, tbls ...*Table) bool {
 	g := func(b *testing.B) {
+		var tbl *Table
 		for i := 0; i < b.N; i++ {
-			_ = joinFn(tbl...)
+			tbl = joinFn(tbls...)
 		}
+		_ = tbl
 	}
 
 	return b.Run(name, g)

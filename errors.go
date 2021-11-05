@@ -1,21 +1,21 @@
 package table
 
-import "errors"
+const (
+	// errDims indicates a slice does not have the same length as
+	// another.
+	errDims = "dimension mismatch"
 
-var (
-	// errDims indicates a slice does not have the same length as another.
-	errDims = errors.New("dimension mismatch")
-
-	// errRange indicates an index is either too small or large to access a
-	// value in an indexible object.
-	errRange = errors.New("index out of range")
+	// errRange indicates an index is either too small or large to
+	// access a value in an indexible object.
+	errRange = "index out of range"
 
 	// errTimeFmt indicates a time string failed to parse.
-	errTimeFmt = errors.New("invalid time format")
+	errTimeFmt = "invalid time format"
 
 	// errType indicates a type does not match another type.
-	errType = errors.New("invalid type")
+	errType = "invalid type"
 
-	// errVarCount indicates an unexpected number variadic arguments were provided.
-	errVarCount = errors.New("unexpected variadic argument provided")
+	// errVarCount indicates an unexpected number variadic arguments
+	// were provided.
+	errVarCount = "unexpected variadic argument provided"
 )

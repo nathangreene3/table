@@ -7,29 +7,29 @@ var (
 	//    0  a
 	//    1  b
 	//    2  c
-	Fmt0 = format{
-		upperHoriz:           "",
-		upperLeftHorizDelim:  "",
-		upperMidHorizDelim:   "",
-		upperRightHorizDelim: "",
+	Fmt0 = Format{
+		UpperHoriz:           "",
+		UpperLeftHorizDelim:  "",
+		UpperMidHorizDelim:   "",
+		UpperRightHorizDelim: "",
 
-		middleHoriz:           "-",
-		middleLeftHorizDelim:  "",
-		middleMidHorizDelim:   "",
-		middleRightHorizDelim: "",
+		MiddleHoriz:           "-",
+		MiddleLeftHorizDelim:  "",
+		MiddleMidHorizDelim:   "",
+		MiddleRightHorizDelim: "",
 
-		bottomHoriz:           "",
-		bottomLeftHorizDelim:  "",
-		bottomMidHorizDelim:   "",
-		bottomRightHorizDelim: "",
+		BottomHoriz:           "",
+		BottomLeftHorizDelim:  "",
+		BottomMidHorizDelim:   "",
+		BottomRightHorizDelim: "",
 
-		headerLeftDelim:  "",
-		headerMidDelim:   "",
-		headerRightDelim: "",
+		HeaderLeftDelim:  "",
+		HeaderMidDelim:   "",
+		HeaderRightDelim: "",
 
-		rowLeftDelim:  "",
-		rowMidDelim:   "",
-		rowRightDelim: "",
+		RowLeftDelim:  "",
+		RowMidDelim:   "",
+		RowRightDelim: "",
 	}
 
 	// Fmt1 ...
@@ -39,29 +39,29 @@ var (
 	//    0  a
 	//    1  b
 	//    2  c
-	Fmt1 = format{
-		upperHoriz:           "-",
-		upperLeftHorizDelim:  "",
-		upperMidHorizDelim:   "",
-		upperRightHorizDelim: "",
+	Fmt1 = Format{
+		UpperHoriz:           "-",
+		UpperLeftHorizDelim:  "",
+		UpperMidHorizDelim:   "",
+		UpperRightHorizDelim: "",
 
-		middleHoriz:           "-",
-		middleLeftHorizDelim:  "",
-		middleMidHorizDelim:   "",
-		middleRightHorizDelim: "",
+		MiddleHoriz:           "-",
+		MiddleLeftHorizDelim:  "",
+		MiddleMidHorizDelim:   "",
+		MiddleRightHorizDelim: "",
 
-		bottomHoriz:           "",
-		bottomLeftHorizDelim:  "",
-		bottomMidHorizDelim:   "",
-		bottomRightHorizDelim: "",
+		BottomHoriz:           "",
+		BottomLeftHorizDelim:  "",
+		BottomMidHorizDelim:   "",
+		BottomRightHorizDelim: "",
 
-		headerLeftDelim:  "",
-		headerMidDelim:   "",
-		headerRightDelim: "",
+		HeaderLeftDelim:  "",
+		HeaderMidDelim:   "",
+		HeaderRightDelim: "",
 
-		rowLeftDelim:  "",
-		rowMidDelim:   "",
-		rowRightDelim: "",
+		RowLeftDelim:  "",
+		RowMidDelim:   "",
+		RowRightDelim: "",
 	}
 
 	// Fmt2 ...
@@ -71,29 +71,29 @@ var (
 	//    1  b
 	//    2  c
 	// -----------
-	Fmt2 = format{
-		upperHoriz:           "",
-		upperLeftHorizDelim:  "",
-		upperMidHorizDelim:   "",
-		upperRightHorizDelim: "",
+	Fmt2 = Format{
+		UpperHoriz:           "",
+		UpperLeftHorizDelim:  "",
+		UpperMidHorizDelim:   "",
+		UpperRightHorizDelim: "",
 
-		middleHoriz:           "-",
-		middleLeftHorizDelim:  "",
-		middleMidHorizDelim:   "",
-		middleRightHorizDelim: "",
+		MiddleHoriz:           "-",
+		MiddleLeftHorizDelim:  "",
+		MiddleMidHorizDelim:   "",
+		MiddleRightHorizDelim: "",
 
-		bottomHoriz:           "-",
-		bottomLeftHorizDelim:  "",
-		bottomMidHorizDelim:   "",
-		bottomRightHorizDelim: "",
+		BottomHoriz:           "-",
+		BottomLeftHorizDelim:  "",
+		BottomMidHorizDelim:   "",
+		BottomRightHorizDelim: "",
 
-		headerLeftDelim:  "",
-		headerMidDelim:   "",
-		headerRightDelim: "",
+		HeaderLeftDelim:  "",
+		HeaderMidDelim:   "",
+		HeaderRightDelim: "",
 
-		rowLeftDelim:  "",
-		rowMidDelim:   "",
-		rowRightDelim: "",
+		RowLeftDelim:  "",
+		RowMidDelim:   "",
+		RowRightDelim: "",
 	}
 
 	// Fmt3 ...
@@ -104,29 +104,29 @@ var (
 	//    1  b
 	//    2  c
 	// ----------
-	Fmt3 = format{
-		upperHoriz:           "-",
-		upperLeftHorizDelim:  "",
-		upperMidHorizDelim:   "",
-		upperRightHorizDelim: "",
+	Fmt3 = Format{
+		UpperHoriz:           "-",
+		UpperLeftHorizDelim:  "",
+		UpperMidHorizDelim:   "",
+		UpperRightHorizDelim: "",
 
-		middleHoriz:           "-",
-		middleLeftHorizDelim:  "",
-		middleMidHorizDelim:   "",
-		middleRightHorizDelim: "",
+		MiddleHoriz:           "-",
+		MiddleLeftHorizDelim:  "",
+		MiddleMidHorizDelim:   "",
+		MiddleRightHorizDelim: "",
 
-		bottomHoriz:           "-",
-		bottomLeftHorizDelim:  "",
-		bottomMidHorizDelim:   "",
-		bottomRightHorizDelim: "",
+		BottomHoriz:           "-",
+		BottomLeftHorizDelim:  "",
+		BottomMidHorizDelim:   "",
+		BottomRightHorizDelim: "",
 
-		headerLeftDelim:  "",
-		headerMidDelim:   "",
-		headerRightDelim: "",
+		HeaderLeftDelim:  "",
+		HeaderMidDelim:   "",
+		HeaderRightDelim: "",
 
-		rowLeftDelim:  "",
-		rowMidDelim:   "",
-		rowRightDelim: "",
+		RowLeftDelim:  "",
+		RowMidDelim:   "",
+		RowRightDelim: "",
 	}
 
 	// Fmt4 ...
@@ -135,29 +135,29 @@ var (
 	//    0   a
 	//    1   b
 	//    2   c
-	Fmt4 = format{
-		upperHoriz:           "",
-		upperLeftHorizDelim:  "",
-		upperMidHorizDelim:   "",
-		upperRightHorizDelim: "",
+	Fmt4 = Format{
+		UpperHoriz:           "",
+		UpperLeftHorizDelim:  "",
+		UpperMidHorizDelim:   "",
+		UpperRightHorizDelim: "",
 
-		middleHoriz:           "-",
-		middleLeftHorizDelim:  "",
-		middleMidHorizDelim:   " ",
-		middleRightHorizDelim: "",
+		MiddleHoriz:           "-",
+		MiddleLeftHorizDelim:  "",
+		MiddleMidHorizDelim:   " ",
+		MiddleRightHorizDelim: "",
 
-		bottomHoriz:           "",
-		bottomLeftHorizDelim:  "",
-		bottomMidHorizDelim:   "",
-		bottomRightHorizDelim: "",
+		BottomHoriz:           "",
+		BottomLeftHorizDelim:  "",
+		BottomMidHorizDelim:   "",
+		BottomRightHorizDelim: "",
 
-		headerLeftDelim:  "",
-		headerMidDelim:   " ",
-		headerRightDelim: "",
+		HeaderLeftDelim:  "",
+		HeaderMidDelim:   " ",
+		HeaderRightDelim: "",
 
-		rowLeftDelim:  "",
-		rowMidDelim:   " ",
-		rowRightDelim: "",
+		RowLeftDelim:  "",
+		RowMidDelim:   " ",
+		RowRightDelim: "",
 	}
 
 	// Fmt5 ...
@@ -168,54 +168,54 @@ var (
 	// |   1 | b   |
 	// |   2 | c   |
 	// +-----+-----+
-	Fmt5 = format{
-		upperHoriz:           "-",
-		upperLeftHorizDelim:  "+",
-		upperMidHorizDelim:   "+",
-		upperRightHorizDelim: "+",
+	Fmt5 = Format{
+		UpperHoriz:           "-",
+		UpperLeftHorizDelim:  "+",
+		UpperMidHorizDelim:   "+",
+		UpperRightHorizDelim: "+",
 
-		middleHoriz:           "-",
-		middleLeftHorizDelim:  "+",
-		middleMidHorizDelim:   "+",
-		middleRightHorizDelim: "+",
+		MiddleHoriz:           "-",
+		MiddleLeftHorizDelim:  "+",
+		MiddleMidHorizDelim:   "+",
+		MiddleRightHorizDelim: "+",
 
-		bottomHoriz:           "-",
-		bottomLeftHorizDelim:  "+",
-		bottomMidHorizDelim:   "+",
-		bottomRightHorizDelim: "+",
+		BottomHoriz:           "-",
+		BottomLeftHorizDelim:  "+",
+		BottomMidHorizDelim:   "+",
+		BottomRightHorizDelim: "+",
 
-		headerLeftDelim:  "|",
-		headerMidDelim:   "|",
-		headerRightDelim: "|",
+		HeaderLeftDelim:  "|",
+		HeaderMidDelim:   "|",
+		HeaderRightDelim: "|",
 
-		rowLeftDelim:  "|",
-		rowMidDelim:   "|",
-		rowRightDelim: "|",
+		RowLeftDelim:  "|",
+		RowMidDelim:   "|",
+		RowRightDelim: "|",
 	}
 )
 
-// format holds decoration characters for displaying a table.
-type format struct {
-	upperHoriz           string
-	upperLeftHorizDelim  string
-	upperMidHorizDelim   string
-	upperRightHorizDelim string
+// Format holds decoration characters for displaying a table.
+type Format struct {
+	UpperHoriz           string
+	UpperLeftHorizDelim  string
+	UpperMidHorizDelim   string
+	UpperRightHorizDelim string
 
-	middleHoriz           string
-	middleLeftHorizDelim  string
-	middleMidHorizDelim   string
-	middleRightHorizDelim string
+	MiddleHoriz           string
+	MiddleLeftHorizDelim  string
+	MiddleMidHorizDelim   string
+	MiddleRightHorizDelim string
 
-	bottomHoriz           string
-	bottomLeftHorizDelim  string
-	bottomMidHorizDelim   string
-	bottomRightHorizDelim string
+	BottomHoriz           string
+	BottomLeftHorizDelim  string
+	BottomMidHorizDelim   string
+	BottomRightHorizDelim string
 
-	headerLeftDelim  string
-	headerMidDelim   string
-	headerRightDelim string
+	HeaderLeftDelim  string
+	HeaderMidDelim   string
+	HeaderRightDelim string
 
-	rowLeftDelim  string
-	rowMidDelim   string
-	rowRightDelim string
+	RowLeftDelim  string
+	RowMidDelim   string
+	RowRightDelim string
 }
