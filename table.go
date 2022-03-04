@@ -69,7 +69,7 @@ func FromCSV(fileName string) (*Table, error) {
 		return New(nil), nil
 	}
 
-	tbl := Table{
+	t := Table{
 		header: Header(lines[0]),
 		types:  make(Types, 0, len(lines[0])),
 		body:   make(Body, 0, len(lines[0])*len(lines[1:])),
@@ -91,10 +91,10 @@ func FromCSV(fileName string) (*Table, error) {
 			}
 		}
 
-		tbl.Append(r)
+		t.Append(r)
 	}
 
-	return &tbl, nil
+	return &t, nil
 }
 
 // FromJSON returns a new table with data parsed from a json-encoded
@@ -102,12 +102,12 @@ func FromCSV(fileName string) (*Table, error) {
 // 	{"header":["", ...],"types":[0, ...],"body":["", ...]}
 func FromJSON(s string) (*Table, error) {
 	var (
-		headerResults = gjson.Get(s, "header").Array()
-		typeResults   = gjson.Get(s, "types").Array()
-		bodyResults   = gjson.Get(s, "body").Array()
-		n             = len(headerResults)
-		mn            = len(bodyResults)
-		t             = Table{
+		header = gjson.Get(s, "header").Array()
+		types  = gjson.Get(s, "types").Array()
+		body   = gjson.Get(s, "body").Array()
+		n      = len(header)
+		mn     = len(body)
+		t      = Table{
 			header: make(Header, 0, n),
 			types:  make(Types, 0, n),
 			body:   make(Body, 0, mn),
@@ -115,28 +115,28 @@ func FromJSON(s string) (*Table, error) {
 	)
 
 	for i := 0; i < n; i++ {
-		t.header = append(t.header, headerResults[i].String())
+		t.header = append(t.header, header[i].String())
 	}
 
 	for i := 0; i < mn; i += n {
 		r := make(Row, 0, n)
 		for j := 0; j < n; j++ {
-			switch Type(typeResults[j].Int()) {
+			switch Type(types[j].Int()) {
 			case Int:
-				r = append(r, int(bodyResults[i+j].Int()))
+				r = append(r, int(body[i+j].Int()))
 			case Flt:
-				r = append(r, float64(bodyResults[i+j].Float()))
+				r = append(r, float64(body[i+j].Float()))
 			case Bool:
-				r = append(r, bool(bodyResults[i+j].Bool()))
+				r = append(r, bool(body[i+j].Bool()))
 			case Time:
-				ft, err := ParseFTime(bodyResults[i+j].String())
+				ft, err := ParseFTime(body[i+j].String())
 				if err != nil {
 					return nil, err
 				}
 
 				r = append(r, ft)
 			case Str:
-				r = append(r, bodyResults[i+j].String())
+				r = append(r, body[i+j].String())
 			default:
 				return nil, errors.New(errType)
 			}
@@ -579,8 +579,7 @@ func (t *Table) Insert(i int, r Row) *Table {
 
 // InsertCol inserts a column into the jth position.
 func (t *Table) InsertCol(j int, colName string, c Column) *Table {
-	_, n := t.Dims()
-	return t.AppendCol(colName, c).SwapCols(j, n)
+	return t.AppendCol(colName, c).SwapCols(j, len(t.header))
 }
 
 // Int returns the (i,j)th value as an integer.
@@ -591,9 +590,8 @@ func (t *Table) Int(i, j int) int {
 // Join several tables having the same number of rows into one.
 func Join(tbl ...*Table) *Table {
 	// TODO: It is expensive to repeatedly append columns
-	var t *Table
 	if 0 < len(tbl) {
-		t = tbl[0].Copy()
+		t := tbl[0].Copy()
 		m0, _ := t.Dims()
 		for i := 1; i < len(tbl); i++ {
 			mi, ni := tbl[i].Dims()
@@ -605,16 +603,15 @@ func Join(tbl ...*Table) *Table {
 				t.AppendCol(tbl[i].header[j], tbl[i].Col(j))
 			}
 		}
-	} else {
-		t = New(NewHeader())
+
+		return t
 	}
 
-	return t
+	return New(NewHeader())
 }
 
 // Join several tables having the same number of rows into one.
 func join1(tbl ...*Table) *Table {
-	var t *Table
 	if 0 < len(tbl) {
 		m, n := tbl[0].Dims()
 		ns := append(make([]int, 0, len(tbl)), n)
@@ -642,17 +639,14 @@ func join1(tbl ...*Table) *Table {
 			return r
 		}
 
-		t = Generate(h, m, f)
-	} else {
-		t = New(NewHeader())
+		return Generate(h, m, f)
 	}
 
-	return t
+	return New(NewHeader())
 }
 
 // Join several tables having the same number of rows into one.
 func join2(tbl ...*Table) *Table {
-	var t *Table
 	if 0 < len(tbl) {
 		m, n := tbl[0].Dims()
 		ns := append(make([]int, 0, len(tbl)), n)
@@ -681,12 +675,10 @@ func join2(tbl ...*Table) *Table {
 			return tbl[k].body[i*ns[k]+j]
 		}
 
-		t = generate2(h, m, f)
-	} else {
-		t = New(NewHeader())
+		return generate2(h, m, f)
 	}
 
-	return t
+	return New(NewHeader())
 }
 
 // JSON returns a json-encoded string representing a table.
@@ -760,8 +752,7 @@ func (t *Table) JSON() string {
 
 // Map mutates each row in a table.
 func (t *Table) Map(f Mapper) *Table {
-	_, n := t.Dims()
-	for i := 0; i < len(t.body); i += n {
+	for i, n := 0, len(t.header); i < len(t.body); i += n {
 		f(Row(t.body[i : i+n]))
 	}
 
@@ -797,8 +788,8 @@ func (t *Table) Reduce(f Reducer) Row {
 // Remove removes and returns the ith row from a table.
 func (t *Table) Remove(i int) Row {
 	var (
-		_, n = t.Dims()
-		r    = NewRow(t.body[i*n : (i+1)*n]...)
+		n = len(t.header)
+		r = NewRow(t.body[i*n : (i+1)*n]...)
 	)
 
 	t.body = append(t.body[:i*n], t.body[(i+1)*n:]...)
@@ -836,7 +827,7 @@ func (t *Table) RemoveCol(j int) (string, Column) {
 
 // Row returns the ith row from a table.
 func (t *Table) Row(i int) Row {
-	_, n := t.Dims()
+	n := len(t.header)
 	return NewRow(t.body[i*n : (i+1)*n]...)
 }
 
@@ -860,8 +851,7 @@ func (t *Table) Set(i, j int, v interface{}) *Table {
 		panic(errType)
 	}
 
-	_, n := t.Dims()
-	t.body[i*n+j] = v
+	t.body[i*len(t.header)+j] = v
 	return t
 }
 
@@ -979,8 +969,7 @@ func (t *Table) Strings() [][]string {
 
 // Swap swaps two rows in a table.
 func (t *Table) Swap(i, j int) *Table {
-	_, n := t.Dims()
-	for k := 0; k < n; k++ {
+	for k, n := 0, len(t.header); k < n; k++ {
 		ik, jk := i*n+k, j*n+k
 		t.body[ik], t.body[jk] = t.body[jk], t.body[ik]
 	}
@@ -993,8 +982,7 @@ func (t *Table) SwapCols(i, j int) *Table {
 	t.header[i], t.header[j] = t.header[j], t.header[i]
 	t.types[i], t.types[j] = t.types[j], t.types[i]
 
-	_, n := t.Dims()
-	for kn := 0; kn < len(t.body); kn += n {
+	for kn, n := 0, len(t.header); kn < len(t.body); kn += n {
 		t.body[kn+i], t.body[kn+j] = t.body[kn+j], t.body[kn+i]
 	}
 
@@ -1053,6 +1041,5 @@ func (t *Table) WriteCSV(file string) error {
 	}
 
 	defer f.Close()
-
 	return csv.NewWriter(f).WriteAll(t.Strings())
 }
