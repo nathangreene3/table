@@ -3,8 +3,11 @@ package table
 // TODO: Add support for complex numbers and money.
 
 const (
+	// Inv corresponds to any invalid type.
+	Inv Type = iota
+
 	// Int corresponds to type int.
-	Int Type = iota + 1
+	Int
 
 	// Flt corresponds to type float64.
 	Flt
@@ -65,6 +68,6 @@ func Parse(x interface{}) Type {
 	case string:
 		return Str
 	default:
-		return 0
+		return Inv
 	}
 }
