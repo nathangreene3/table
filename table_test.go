@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
-	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -404,11 +403,29 @@ func TestFilter(t *testing.T) {
 		// Evens
 		var (
 			hdr              = NewHeader("n", "even")
-			recGen Generator = func(i int) Row { return Row{i, i%2 == 0} }
-			expGen Generator = func(i int) Row { i <<= 1; return Row{i, i%2 == 0} }
-			fltr   Filterer  = func(r Row) bool { return r[0].(int)%2 == 0 }
-			rec              = Generate(hdr, 5, recGen).Filter(fltr)
-			exp              = Generate(hdr, 3, expGen)
+			recGen Generator = func(i, j int) interface{} {
+				switch j {
+				case 0:
+					return i
+				case 1:
+					return i % 2
+				default:
+					return nil
+				}
+			}
+			expGen Generator = func(i, j int) interface{} {
+				switch j {
+				case 0:
+					return i << 1
+				case 1:
+					return (i << 1) % 2
+				default:
+					return nil
+				}
+			}
+			fltr Filterer = func(r Row) bool { return r[0].(int)%2 == 0 }
+			rec           = Generate(hdr, 5, recGen).Filter(fltr)
+			exp           = Generate(hdr, 3, expGen)
 		)
 
 		if !exp.Equal(rec) {
@@ -451,34 +468,17 @@ func TestFilter(t *testing.T) {
 }
 
 func TestGen(t *testing.T) {
-	intStr := func(n int) string {
-		var s string
-		switch n {
-		case 0:
-			s = "zero"
-		case 1:
-			s = "one"
-		case 2:
-			s = "two"
-		case 3:
-			s = "three"
-		case 4:
-			s = "four"
-		case 5:
-			s = "five"
-		case 6:
-			s = "six"
-		case 7:
-			s = "seven"
-		case 8:
-			s = "eight"
-		case 9:
-			s = "nine"
-		default:
-			panic("Value not yet supported")
-		}
-
-		return s
+	intStr := map[int]string{
+		0: "zero",
+		1: "one",
+		2: "two",
+		3: "three",
+		4: "four",
+		5: "five",
+		6: "six",
+		7: "seven",
+		8: "eight",
+		9: "nine",
 	}
 
 	tests := []struct {
@@ -490,14 +490,21 @@ func TestGen(t *testing.T) {
 		{
 			h: NewHeader("Integers", "Floats", "Booleans", "Times", "Strings"),
 			m: 5,
-			f: func(i int) Row {
-				s := strconv.Itoa(i)
-				f, err := strconv.ParseFloat(s+"."+s, 64)
-				if err != nil {
-					panic(err)
+			f: func(i, j int) interface{} {
+				switch j {
+				case 0:
+					return i
+				case 1:
+					return float64(i) + float64(i)/10.0
+				case 2:
+					return 2 < i
+				case 3:
+					return NewFTime(time.Time{}.Add(time.Duration(i)))
+				case 4:
+					return intStr[i]
+				default:
+					return nil
 				}
-
-				return NewRow(i, f, 2 < i, NewFTime(time.Time{}.Add(time.Duration(i))), intStr(i))
 			},
 			exp: New(
 				NewHeader("Integers", "Floats", "Booleans", "Times", "Strings"),
@@ -648,20 +655,6 @@ func TestJoin(t *testing.T) {
 	for i, test := range tests {
 		if rec := Join(test.tbl...); !test.exp.Equal(rec) {
 			t.Errorf("\n"+
-				" test %d: Join\n"+
-				"expected: \n%s\n"+
-				"received: \n%s\n",
-				i,
-				test.exp,
-				rec)
-		}
-
-		if rec := join1(test.tbl...); !test.exp.Equal(rec) {
-			t.Errorf("\nTest %d: join\nexpected: \n%s\nreceived: \n%s\n", i, test.exp, rec)
-		}
-
-		if rec := join2(test.tbl...); !test.exp.Equal(rec) {
-			t.Errorf("\n"+
 				" test %d: join2\n"+
 				"expected: \n%s\n"+
 				"received: \n%s\n",
@@ -781,11 +774,29 @@ func TestMap(t *testing.T) {
 		// Evens
 		var (
 			hdr              = NewHeader("n", "is even")
-			recGen Generator = func(i int) Row { return Row{i, i%2 == 0} }
-			expGen Generator = func(i int) Row { i <<= 1; return Row{i, i%2 == 0} }
-			mpr    Mapper    = func(r Row) { r[0] = r[0].(int) << 1; r[1] = r[0].(int)%2 == 0 }
-			rec              = Generate(hdr, 5, recGen).Map(mpr)
-			exp              = Generate(hdr, 5, expGen)
+			recGen Generator = func(i, j int) interface{} {
+				switch j {
+				case 0:
+					return i
+				case 1:
+					return i % 2
+				default:
+					return nil
+				}
+			}
+			expGen Generator = func(i, j int) interface{} {
+				switch j {
+				case 0:
+					return i << 1
+				case 1:
+					return (i<<1)%2 == 0
+				default:
+					return nil
+				}
+			}
+			mpr Mapper = func(r Row) { r[0] = r[0].(int) << 1; r[1] = r[0].(int)%2 == 0 }
+			rec        = Generate(hdr, 5, recGen).Map(mpr)
+			exp        = Generate(hdr, 5, expGen)
 		)
 
 		if !exp.Equal(rec) {
@@ -804,7 +815,7 @@ func TestReduce(t *testing.T) {
 		// Sum 0 + 1 + ... + (n-1) = n*(n-1)/2
 		var (
 			h                = NewHeader("n")
-			recGen Generator = func(i int) Row { return Row{i} }
+			recGen Generator = func(i, j int) interface{} { return i }
 			rdcr   Reducer   = func(dst, src Row) { dst[0] = dst[0].(int) + src[0].(int) }
 			n                = 5
 			rec              = Generate(h, n, recGen).Reduce(rdcr)
@@ -948,7 +959,7 @@ func BenchmarkJoin(b *testing.B) {
 		m0, m1, dm = 8, 8, 1 // Number of rows
 		n0, n1, dn = 8, 8, 1 // Number of columns
 		k0, k1, dk = 8, 8, 1 // Number of tables
-		s          = strings.Repeat("hello", 8)
+		s          = strings.Repeat("helloworld", 8)
 	)
 
 	for n := n0; n <= n1; n += dn {
@@ -972,54 +983,10 @@ func BenchmarkJoin(b *testing.B) {
 			}
 		}
 	}
-
-	for n := n0; n <= n1; n += dn {
-		for m := m0; m <= m1; m += dm {
-			col := NewCol()
-			for mi := 0; mi < m; mi++ {
-				col = append(col, s)
-			}
-
-			tbl := New(NewHeader())
-			for ni := 1; ni < n; ni++ {
-				tbl.AppendCol("Strings", col)
-			}
-
-			tbls := make([]*Table, 0, k1)
-			for k := k0; k <= k1; k += dk {
-				for ; len(tbls) < k; tbls = append(tbls, tbl.Copy()) {
-				}
-
-				benchmarkJoin(b, fmt.Sprintf("join1 %d %dx%d tables", k, m, n), join1, tbls...)
-			}
-		}
-	}
-
-	for n := n0; n <= n1; n += dn {
-		for m := m0; m <= m1; m += dm {
-			col := NewCol()
-			for mi := 0; mi < m; mi++ {
-				col = append(col, s)
-			}
-
-			tbl := New(NewHeader())
-			for ni := 1; ni < n; ni++ {
-				tbl.AppendCol("Strings", col)
-			}
-
-			tbls := make([]*Table, 0, k1)
-			for k := k0; k <= k1; k += dk {
-				for ; len(tbls) < k; tbls = append(tbls, tbl.Copy()) {
-				}
-
-				benchmarkJoin(b, fmt.Sprintf("join2 %d %dx%d tables", k, m, n), join2, tbls...)
-			}
-		}
-	}
 }
 
 func benchmarkJoin(b *testing.B, name string, joinFn func(tbl ...*Table) *Table, tbls ...*Table) bool {
-	g := func(b *testing.B) {
+	f := func(b *testing.B) {
 		var tbl *Table
 		for i := 0; i < b.N; i++ {
 			tbl = joinFn(tbls...)
@@ -1027,5 +994,5 @@ func benchmarkJoin(b *testing.B, name string, joinFn func(tbl ...*Table) *Table,
 		_ = tbl
 	}
 
-	return b.Run(name, g)
+	return b.Run(name, f)
 }
