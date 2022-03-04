@@ -69,7 +69,7 @@ func FromCSV(fileName string) (*Table, error) {
 		return New(nil), nil
 	}
 
-	t := Table{
+	tbl := Table{
 		header: Header(lines[0]),
 		types:  make(Types, 0, len(lines[0])),
 		body:   make(Body, 0, len(lines[0])*len(lines[1:])),
@@ -91,10 +91,10 @@ func FromCSV(fileName string) (*Table, error) {
 			}
 		}
 
-		t.Append(r)
+		tbl.Append(r)
 	}
 
-	return &t, nil
+	return &tbl, nil
 }
 
 // FromJSON returns a new table with data parsed from a json-encoded
@@ -1051,6 +1051,8 @@ func (t *Table) WriteCSV(file string) error {
 	if err != nil {
 		return err
 	}
+
+	defer f.Close()
 
 	return csv.NewWriter(f).WriteAll(t.Strings())
 }
