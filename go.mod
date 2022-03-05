@@ -3,8 +3,8 @@ module github.com/nathangreene3/table
 go 1.17
 
 require (
-	github.com/tidwall/gjson v1.11.0
-	github.com/tidwall/sjson v1.2.3
+	github.com/tidwall/gjson v1.14.0
+	github.com/tidwall/sjson v1.2.4
 )
 
 require (

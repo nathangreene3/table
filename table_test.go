@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
-	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -146,7 +145,12 @@ func TestFormat(t *testing.T) {
 
 	for _, test := range tests {
 		if rec := test.tbl.Format(test.fmt); test.exp != rec {
-			t.Errorf("\nexpected:\n%q\nreceived:\n%q\n", test.exp, rec)
+			t.Errorf("\n"+
+				"expected:\n%q\n"+
+				"received:\n%q\n",
+				test.exp,
+				rec,
+			)
 		}
 	}
 }
@@ -194,114 +198,170 @@ func TestAppendCol(t *testing.T) {
 
 	for _, test := range tests {
 		if rec := test.tbl.AppendCol(test.colName, test.col); !test.exp.Equal(rec) {
-			t.Errorf("\nexpected:\n%v\nreceived:\n%v\n", test.exp, rec)
+			t.Errorf("\n"+
+				"expected:\n%v\n"+
+				"received:\n%v\n",
+				test.exp,
+				rec,
+			)
 		}
 	}
 }
 
 func TestCSV(t *testing.T) {
-	var (
-		fileName = "test.csv"
-		expLines = [][]string{
-			{"Integers", "Floats", "Booleans", "Times", "Strings"},
-			{"0", "0.0", "false", "0001-01-01T00:00:00Z", "zero"},
-			{"1", "1.1", "false", "0001-01-01T00:00:00.000000001Z", "one"},
-			{"2", "2.2", "false", "0001-01-01T00:00:00.000000002Z", "two"},
-			{"3", "3.3", "true", "0001-01-01T00:00:00.000000003Z", "three"},
-			{"4", "4.4", "true", "0001-01-01T00:00:00.000000004Z", "four"},
+	const fileName = "test.csv"
+	var expLines = [][]string{
+		{"Integers", "Floats", "Booleans", "Times", "Strings"},
+		{"0", "0.0", "false", "0001-01-01T00:00:00Z", "zero"},
+		{"1", "1.1", "false", "0001-01-01T00:00:00.000000001Z", "one"},
+		{"2", "2.2", "false", "0001-01-01T00:00:00.000000002Z", "two"},
+		{"3", "3.3", "true", "0001-01-01T00:00:00.000000003Z", "three"},
+		{"4", "4.4", "true", "0001-01-01T00:00:00.000000004Z", "four"},
+	}
+
+	// 1. Create a new file with csv package. This file is considered valid before table reads the file's contents.
+	os.Remove(fileName) // Intentionally ignore error here
+
+	file, err := os.OpenFile(fileName, os.O_RDWR|os.O_CREATE, os.ModePerm)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	var closed, removed bool
+	defer func() {
+		if !closed {
+			if err := file.Close(); err != nil {
+				t.Fatal(err)
+			}
+
+			closed = true
 		}
+
+		if !removed {
+			if err := os.Remove(fileName); err != nil {
+				t.Fatal(err)
+			}
+
+			removed = true
+		}
+	}()
+
+	if err := csv.NewWriter(file).WriteAll(expLines[:4]); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := file.Close(); err != nil {
+		t.Fatal(err)
+	}
+
+	closed = true
+
+	// 2. Read from an existing csv file, append several rows, then replace the file's contents.
+	tbl, err := FromCSV(fileName)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	tbl.Append(
+		NewRow(3, 3.3, true, NewFTime(time.Time{}.Add(3)), "three"),
+		NewRow(4, 4.4, true, NewFTime(time.Time{}.Add(4)), "four"),
 	)
 
-	{
-		// 1. Create a new file with csv package. This file is considered valid before table reads the file's contents.
-		os.Remove(fileName) // Intentionally ignore error here
-		file, err := os.OpenFile(fileName, os.O_RDWR|os.O_CREATE, os.ModePerm)
-		if err != nil {
-			t.Fatal(err)
-		}
-
-		if err := csv.NewWriter(file).WriteAll(expLines[:4]); err != nil {
-			t.Fatal(err)
-		}
-
-		file.Close()
+	if err := tbl.WriteCSV(fileName); err != nil {
+		t.Fatal(err)
 	}
 
-	{
-		// 2. Read from an existing csv file, append several rows, then replace the file's contents.
-		tbl, err := FromCSV(fileName)
-		if err != nil {
-			t.Fatal(err)
-		}
+	// 3. Read table-modified csv file into new table and compare to expected table.
+	tbl, err = FromCSV(fileName)
+	if err != nil {
+		t.Fatal(err)
+	}
 
-		tbl.Append(
-			NewRow(3, 3.3, true, NewFTime(time.Time{}.Add(3)), "three"),
-			NewRow(4, 4.4, true, NewFTime(time.Time{}.Add(4)), "four"),
+	expTbl := New(
+		NewHeader("Integers", "Floats", "Booleans", "Times", "Strings"),
+		NewRow(0, 0.0, false, NewFTime(time.Time{}.Add(0)), "zero"),
+		NewRow(1, 1.1, false, NewFTime(time.Time{}.Add(1)), "one"),
+		NewRow(2, 2.2, false, NewFTime(time.Time{}.Add(2)), "two"),
+		NewRow(3, 3.3, true, NewFTime(time.Time{}.Add(3)), "three"),
+		NewRow(4, 4.4, true, NewFTime(time.Time{}.Add(4)), "four"),
+	)
+
+	if !expTbl.Equal(tbl) {
+		t.Fatalf("\n"+
+			"expected: %s\n"+
+			"received: %s\n",
+			expTbl,
+			tbl,
 		)
-
-		if err := tbl.WriteCSV(fileName); err != nil {
-			t.Fatal(err)
-		}
 	}
 
-	{
-		// 3. Read table-modified csv file into new table and compare to expected table.
-		tbl, err := FromCSV(fileName)
-		if err != nil {
-			t.Fatal(err)
-		}
-
-		expTbl := New(
-			NewHeader("Integers", "Floats", "Booleans", "Times", "Strings"),
-			NewRow(0, 0.0, false, NewFTime(time.Time{}.Add(0)), "zero"),
-			NewRow(1, 1.1, false, NewFTime(time.Time{}.Add(1)), "one"),
-			NewRow(2, 2.2, false, NewFTime(time.Time{}.Add(2)), "two"),
-			NewRow(3, 3.3, true, NewFTime(time.Time{}.Add(3)), "three"),
-			NewRow(4, 4.4, true, NewFTime(time.Time{}.Add(4)), "four"),
-		)
-
-		if !expTbl.Equal(tbl) {
-			t.Fatalf("\nexpected: %s\nreceived: %s\n", expTbl, tbl)
-		}
+	// 4. Compare csv file with csv package.
+	file, err = os.Open(fileName)
+	if err != nil {
+		t.Fatal(err)
 	}
 
-	{
-		// 4. Compare csv file with csv package.
-		file, err := os.Open(fileName)
-		if err != nil {
-			t.Fatal(err)
-		}
+	closed = false
 
-		lines, err := csv.NewReader(file).ReadAll()
-		if err != nil {
-			t.Fatal(err)
-		}
-
-		if len(expLines) != len(lines) {
-			t.Fatalf("\nexpected %d lines\nreceived %d lines\n", len(expLines), len(lines))
-		}
-
-		for i := 0; i < len(expLines); i++ {
-			if len(expLines[i]) != len(lines[i]) {
-				t.Fatalf("\nexpected line %d to have %d columns\nreceived %d columns\n", i, len(expLines[i]), len(lines[i]))
+	defer func() {
+		if !closed {
+			if err := file.Close(); err != nil {
+				t.Fatal(err)
 			}
 
-			for j := 0; j < len(expLines[i]); j++ {
-				if !strings.EqualFold(expLines[i][j], lines[i][j]) {
-					t.Fatalf("\nexpected line %d, column %d to be %q\nreceived %q\n", i, j, expLines[i][j], lines[i][j])
-				}
+			closed = true
+		}
+
+		if !removed {
+			if err := os.Remove(fileName); err != nil {
+				t.Fatal(err)
+			}
+
+			removed = true
+		}
+	}()
+
+	lines, err := csv.NewReader(file).ReadAll()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if len(expLines) != len(lines) {
+		t.Fatalf("\n"+
+			"expected %d lines\n"+
+			"received %d lines\n",
+			len(expLines),
+			len(lines),
+		)
+	}
+
+	for i := 0; i < len(expLines); i++ {
+		if len(expLines[i]) != len(lines[i]) {
+			t.Fatalf("\n"+
+				"expected line %d to have %d columns\n"+
+				"received %d columns\n",
+				i, len(expLines[i]),
+				len(lines[i]),
+			)
+		}
+
+		for j := 0; j < len(expLines[i]); j++ {
+			if !strings.EqualFold(expLines[i][j], lines[i][j]) {
+				t.Fatalf("\n"+
+					"expected line %d, column %d to be %q\n"+
+					"received %q\n",
+					i, j, expLines[i][j],
+					lines[i][j],
+				)
 			}
 		}
-
-		file.Close()
 	}
 
-	{
-		// 5. Clean up.
-		if err := os.Remove(fileName); err != nil {
-			t.Fatal(err)
-		}
+	if err := file.Close(); err != nil {
+		t.Fatal(err)
 	}
+
+	closed = true
 }
 
 func TestDims(t *testing.T) {
@@ -328,7 +388,12 @@ func TestDims(t *testing.T) {
 
 	for _, test := range tests {
 		if recM, recN := test.tbl.Dims(); test.expM != recM || test.expN != recN {
-			t.Errorf("\nexpected (%d,%d)\nreceived (%d,%d)\n", test.expM, test.expN, recM, recN)
+			t.Errorf("\n"+
+				"expected (%d,%d)\n"+
+				"received (%d,%d)\n",
+				test.expM, test.expN,
+				recM, recN,
+			)
 		}
 	}
 }
@@ -338,15 +403,38 @@ func TestFilter(t *testing.T) {
 		// Evens
 		var (
 			hdr              = NewHeader("n", "even")
-			recGen Generator = func(i int) Row { return Row{i, i%2 == 0} }
-			expGen Generator = func(i int) Row { i <<= 1; return Row{i, i%2 == 0} }
-			fltr   Filterer  = func(r Row) bool { return r[0].(int)%2 == 0 }
-			rec              = Generate(hdr, 5, recGen).Filter(fltr)
-			exp              = Generate(hdr, 3, expGen)
+			recGen Generator = func(i, j int) interface{} {
+				switch j {
+				case 0:
+					return i
+				case 1:
+					return i % 2
+				default:
+					return nil
+				}
+			}
+			expGen Generator = func(i, j int) interface{} {
+				switch j {
+				case 0:
+					return i << 1
+				case 1:
+					return (i << 1) % 2
+				default:
+					return nil
+				}
+			}
+			fltr Filterer = func(r Row) bool { return r[0].(int)%2 == 0 }
+			rec           = Generate(hdr, 5, recGen).Filter(fltr)
+			exp           = Generate(hdr, 3, expGen)
 		)
 
 		if !exp.Equal(rec) {
-			t.Fatalf("\nexpected %s\nreceived %s\n", exp, rec)
+			t.Fatalf("\n"+
+				"expected %s\n"+
+				"received %s\n",
+				exp,
+				rec,
+			)
 		}
 	}
 
@@ -380,34 +468,17 @@ func TestFilter(t *testing.T) {
 }
 
 func TestGen(t *testing.T) {
-	intStr := func(n int) string {
-		var s string
-		switch n {
-		case 0:
-			s = "zero"
-		case 1:
-			s = "one"
-		case 2:
-			s = "two"
-		case 3:
-			s = "three"
-		case 4:
-			s = "four"
-		case 5:
-			s = "five"
-		case 6:
-			s = "six"
-		case 7:
-			s = "seven"
-		case 8:
-			s = "eight"
-		case 9:
-			s = "nine"
-		default:
-			panic("Value not yet supported")
-		}
-
-		return s
+	intStr := map[int]string{
+		0: "zero",
+		1: "one",
+		2: "two",
+		3: "three",
+		4: "four",
+		5: "five",
+		6: "six",
+		7: "seven",
+		8: "eight",
+		9: "nine",
 	}
 
 	tests := []struct {
@@ -419,14 +490,21 @@ func TestGen(t *testing.T) {
 		{
 			h: NewHeader("Integers", "Floats", "Booleans", "Times", "Strings"),
 			m: 5,
-			f: func(i int) Row {
-				s := strconv.Itoa(i)
-				f, err := strconv.ParseFloat(s+"."+s, 64)
-				if err != nil {
-					panic(err)
+			f: func(i, j int) interface{} {
+				switch j {
+				case 0:
+					return i
+				case 1:
+					return float64(i) + float64(i)/10.0
+				case 2:
+					return 2 < i
+				case 3:
+					return NewFTime(time.Time{}.Add(time.Duration(i)))
+				case 4:
+					return intStr[i]
+				default:
+					return nil
 				}
-
-				return NewRow(i, f, 2 < i, NewFTime(time.Time{}.Add(time.Duration(i))), intStr(i))
 			},
 			exp: New(
 				NewHeader("Integers", "Floats", "Booleans", "Times", "Strings"),
@@ -441,7 +519,12 @@ func TestGen(t *testing.T) {
 
 	for _, test := range tests {
 		if rec := Generate(test.h, test.m, test.f); !test.exp.Equal(rec) {
-			t.Errorf("\nexpected:\n%v\nreceived:\n%v\n", test.exp, rec)
+			t.Errorf("\n"+
+				"expected:\n%v\n"+
+				"received:\n%v\n",
+				test.exp,
+				rec,
+			)
 		}
 	}
 }
@@ -571,15 +654,14 @@ func TestJoin(t *testing.T) {
 
 	for i, test := range tests {
 		if rec := Join(test.tbl...); !test.exp.Equal(rec) {
-			t.Errorf("\nTest %d: Join\nexpected: \n%s\nreceived: \n%s\n", i, test.exp, rec)
-		}
-
-		if rec := join1(test.tbl...); !test.exp.Equal(rec) {
-			t.Errorf("\nTest %d: join\nexpected: \n%s\nreceived: \n%s\n", i, test.exp, rec)
-		}
-
-		if rec := join2(test.tbl...); !test.exp.Equal(rec) {
-			t.Errorf("\nTest %d: join2\nexpected: \n%s\nreceived: \n%s\n", i, test.exp, rec)
+			t.Errorf("\n"+
+				" test %d: join2\n"+
+				"expected: \n%s\n"+
+				"received: \n%s\n",
+				i,
+				test.exp,
+				rec,
+			)
 		}
 	}
 }
@@ -626,7 +708,12 @@ func TestJSON(t *testing.T) {
 	)
 
 	if !expTbl.Equal(tbl) {
-		t.Fatalf("\nexpected: %s\nreceived: %s\n", expTbl, tbl)
+		t.Fatalf("\n"+
+			"expected: %s\n"+
+			"received: %s\n",
+			expTbl,
+			tbl,
+		)
 	}
 
 	expBody = append(
@@ -642,7 +729,12 @@ func TestJSON(t *testing.T) {
 
 	outJSON := tbl.JSON()
 	if !strings.EqualFold(expJSON, outJSON) {
-		t.Fatalf("\nexpected %q\nreceived %q\n", expJSON, outJSON)
+		t.Fatalf("\n"+
+			"expected %q\n"+
+			"received %q\n",
+			expJSON,
+			outJSON,
+		)
 	}
 
 	{
@@ -667,7 +759,12 @@ func TestJSON(t *testing.T) {
 		}
 
 		if !bytes.Equal(expBts, recBts) {
-			t.Errorf("\nexpected %q\nreceived %q\n", string(expBts), string(recBts))
+			t.Errorf("\n"+
+				"expected %q\n"+
+				"received %q\n",
+				string(expBts),
+				string(recBts),
+			)
 		}
 	}
 }
@@ -677,15 +774,38 @@ func TestMap(t *testing.T) {
 		// Evens
 		var (
 			hdr              = NewHeader("n", "is even")
-			recGen Generator = func(i int) Row { return Row{i, i%2 == 0} }
-			expGen Generator = func(i int) Row { i <<= 1; return Row{i, i%2 == 0} }
-			mpr    Mapper    = func(r Row) { r[0] = r[0].(int) << 1; r[1] = r[0].(int)%2 == 0 }
-			rec              = Generate(hdr, 5, recGen).Map(mpr)
-			exp              = Generate(hdr, 5, expGen)
+			recGen Generator = func(i, j int) interface{} {
+				switch j {
+				case 0:
+					return i
+				case 1:
+					return i % 2
+				default:
+					return nil
+				}
+			}
+			expGen Generator = func(i, j int) interface{} {
+				switch j {
+				case 0:
+					return i << 1
+				case 1:
+					return (i<<1)%2 == 0
+				default:
+					return nil
+				}
+			}
+			mpr Mapper = func(r Row) { r[0] = r[0].(int) << 1; r[1] = r[0].(int)%2 == 0 }
+			rec        = Generate(hdr, 5, recGen).Map(mpr)
+			exp        = Generate(hdr, 5, expGen)
 		)
 
 		if !exp.Equal(rec) {
-			t.Fatalf("\nexpected %s\nreceived %s\n", exp, rec)
+			t.Fatalf("\n"+
+				"expected %s\n"+
+				"received %s\n",
+				exp,
+				rec,
+			)
 		}
 	}
 }
@@ -695,7 +815,7 @@ func TestReduce(t *testing.T) {
 		// Sum 0 + 1 + ... + (n-1) = n*(n-1)/2
 		var (
 			h                = NewHeader("n")
-			recGen Generator = func(i int) Row { return Row{i} }
+			recGen Generator = func(i, j int) interface{} { return i }
 			rdcr   Reducer   = func(dst, src Row) { dst[0] = dst[0].(int) + src[0].(int) }
 			n                = 5
 			rec              = Generate(h, n, recGen).Reduce(rdcr)
@@ -703,7 +823,12 @@ func TestReduce(t *testing.T) {
 		)
 
 		if !exp.Equal(rec) {
-			t.Fatalf("\nexpected %s\nreceived %s\n", exp, rec)
+			t.Fatalf("\n"+
+				"expected %s\n"+
+				"received %s\n",
+				exp,
+				rec,
+			)
 		}
 	}
 }
@@ -812,7 +937,14 @@ func TestStable(t *testing.T) {
 
 	for _, test := range tests {
 		if rec := test.tbl.Copy().Stable(test.col); !test.exp.Equal(rec) {
-			t.Errorf("\n   given: col = %d\nexpected:\n%v\nreceived:\n%v\n", test.col, test.exp, rec)
+			t.Errorf("\n"+
+				"   given: col = %d\n"+
+				"expected:\n%v\n"+
+				"received:\n%v\n",
+				test.col,
+				test.exp,
+				rec,
+			)
 		}
 	}
 }
@@ -827,7 +959,7 @@ func BenchmarkJoin(b *testing.B) {
 		m0, m1, dm = 8, 8, 1 // Number of rows
 		n0, n1, dn = 8, 8, 1 // Number of columns
 		k0, k1, dk = 8, 8, 1 // Number of tables
-		s          = strings.Repeat("hello", 8)
+		s          = strings.Repeat("helloworld", 8)
 	)
 
 	for n := n0; n <= n1; n += dn {
@@ -851,54 +983,10 @@ func BenchmarkJoin(b *testing.B) {
 			}
 		}
 	}
-
-	for n := n0; n <= n1; n += dn {
-		for m := m0; m <= m1; m += dm {
-			col := NewCol()
-			for mi := 0; mi < m; mi++ {
-				col = append(col, s)
-			}
-
-			tbl := New(NewHeader())
-			for ni := 1; ni < n; ni++ {
-				tbl.AppendCol("Strings", col)
-			}
-
-			tbls := make([]*Table, 0, k1)
-			for k := k0; k <= k1; k += dk {
-				for ; len(tbls) < k; tbls = append(tbls, tbl.Copy()) {
-				}
-
-				benchmarkJoin(b, fmt.Sprintf("join1 %d %dx%d tables", k, m, n), join1, tbls...)
-			}
-		}
-	}
-
-	for n := n0; n <= n1; n += dn {
-		for m := m0; m <= m1; m += dm {
-			col := NewCol()
-			for mi := 0; mi < m; mi++ {
-				col = append(col, s)
-			}
-
-			tbl := New(NewHeader())
-			for ni := 1; ni < n; ni++ {
-				tbl.AppendCol("Strings", col)
-			}
-
-			tbls := make([]*Table, 0, k1)
-			for k := k0; k <= k1; k += dk {
-				for ; len(tbls) < k; tbls = append(tbls, tbl.Copy()) {
-				}
-
-				benchmarkJoin(b, fmt.Sprintf("join2 %d %dx%d tables", k, m, n), join2, tbls...)
-			}
-		}
-	}
 }
 
 func benchmarkJoin(b *testing.B, name string, joinFn func(tbl ...*Table) *Table, tbls ...*Table) bool {
-	g := func(b *testing.B) {
+	f := func(b *testing.B) {
 		var tbl *Table
 		for i := 0; i < b.N; i++ {
 			tbl = joinFn(tbls...)
@@ -906,5 +994,5 @@ func benchmarkJoin(b *testing.B, name string, joinFn func(tbl ...*Table) *Table,
 		_ = tbl
 	}
 
-	return b.Run(name, g)
+	return b.Run(name, f)
 }
