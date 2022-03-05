@@ -178,38 +178,40 @@ func Generate(h Header, m int, f Generator) *Table {
 
 // Append several rows to a table.
 func (t *Table) Append(r ...Row) *Table {
-	if 0 < len(r) {
-		var i int
-		if len(t.body) == 0 {
-			if len(t.header) != len(r[0]) {
-				panic(errDims)
-			}
+	if len(r) == 0 {
+		return t
+	}
 
-			for j := 0; j < len(r[0]); j++ {
-				switch tp := Parse(r[0][j]); tp {
-				case Int, Flt, Bool, Time, Str:
-					t.types = append(t.types, tp)
-					t.body = append(t.body, r[0][j])
-				default:
-					panic(errType)
-				}
-			}
-
-			i++
+	var i int
+	if len(t.body) == 0 {
+		if len(t.header) != len(r[0]) {
+			panic(errDims)
 		}
 
-		for ; i < len(r); i++ {
-			if len(t.header) != len(r[i]) {
-				panic(errDims)
+		for j := 0; j < len(r[0]); j++ {
+			switch tp := Parse(r[0][j]); tp {
+			case Int, Flt, Bool, Time, Str:
+				t.types = append(t.types, tp)
+				t.body = append(t.body, r[0][j])
+			default:
+				panic(errType)
+			}
+		}
+
+		i++
+	}
+
+	for ; i < len(r); i++ {
+		if len(t.header) != len(r[i]) {
+			panic(errDims)
+		}
+
+		for j := 0; j < len(r[i]); j++ {
+			if t.types[j] != Parse(r[i][j]) {
+				panic(errType)
 			}
 
-			for j := 0; j < len(r[i]); j++ {
-				if t.types[j] != Parse(r[i][j]) {
-					panic(errType)
-				}
-
-				t.body = append(t.body, r[i][j])
-			}
+			t.body = append(t.body, r[i][j])
 		}
 	}
 
@@ -686,6 +688,11 @@ func (t *Table) Map(f Mapper) *Table {
 
 	for ; i < len(t.body); i += n {
 		f(Row(t.body[i : i+n]))
+		for j := 0; j < n; j++ {
+			if Parse(t.body[i+j]) != t.types[j] {
+				panic(errType)
+			}
+		}
 	}
 
 	return t
@@ -701,10 +708,8 @@ func (t *Table) MarshalJSON() ([]byte, error) {
 // each row in a table. A copy of the first row is used as the
 // accumulator.
 func (t *Table) Reduce(f Reducer) Row {
-	var (
-		m, n = t.Dims()
-		r    = make(Row, 0, n)
-	)
+	m, n := t.Dims()
+	r := make(Row, 0, n)
 
 	if 0 < m {
 		r = append(r, t.body[:n]...)
@@ -719,10 +724,8 @@ func (t *Table) Reduce(f Reducer) Row {
 
 // Remove removes and returns the ith row from a table.
 func (t *Table) Remove(i int) Row {
-	var (
-		n = len(t.header)
-		r = NewRow(t.body[i*n : (i+1)*n]...)
-	)
+	n := len(t.header)
+	r := NewRow(t.body[i*n : (i+1)*n]...)
 
 	t.body = append(t.body[:i*n], t.body[(i+1)*n:]...)
 	if len(t.body) < n {
@@ -765,10 +768,8 @@ func (t *Table) Row(i int) Row {
 
 // Rows returns a list of all the rows in a table.
 func (t *Table) Rows() []Row {
-	var (
-		m, n = t.Dims()
-		rs   = make([]Row, 0, m)
-	)
+	m, n := t.Dims()
+	rs := make([]Row, 0, m)
 
 	for i, mn := 0, m*n; i < mn; i += n {
 		rs = append(rs, NewRow(t.body[i:i+n]...))
